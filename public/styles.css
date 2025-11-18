@@ -1,0 +1,493 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: "Open Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: #FFFFFF;
+    margin: 0;
+    padding: 0;
+    color: #231F20;
+    font-size: 16px;
+    line-height: 1.6;
+}
+
+.top-nav {
+    background: #231F20;
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.top-nav .logo {
+    width: 32px;
+    height: 32px;
+}
+
+.top-nav h1 {
+    color: #FFFFFF;
+    font-family: "Montserrat", sans-serif;
+    font-size: 20px;
+    font-weight: 600;
+    margin: 0;
+}
+
+.player-container {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.main-content {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+    background: #FFFFFF;
+}
+
+.album-art-section {
+    position: relative;
+    padding: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #F5EADA;
+}
+
+.album-art-wrapper {
+    position: relative;
+    width: 100%;
+    max-width: 400px;
+}
+
+.year-badge {
+    position: absolute;
+    top: 0;
+    right: 0;
+    background: #EFA63C;
+    color: #FFFFFF;
+    font-family: "Montserrat", sans-serif;
+    font-weight: 700;
+    font-size: 24px;
+    padding: 12px 20px;
+    border-radius: 0 0 0 8px;
+    z-index: 10;
+}
+
+.album-art {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1;
+    object-fit: cover;
+    border-radius: 4px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.info-section {
+    padding: 32px 40px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    background: #FFFFFF;
+}
+
+.track-artist {
+    font-size: 32px;
+    font-weight: 700;
+    font-family: "Montserrat", sans-serif;
+    color: #1F4E23;
+    margin-bottom: 8px;
+    line-height: 1.2;
+}
+
+.track-title {
+    font-size: 20px;
+    font-weight: 600;
+    color: #231F20;
+    margin-bottom: 16px;
+    line-height: 1.4;
+}
+
+.track-album {
+    font-size: 14px;
+    font-weight: 600;
+    color: #38A29D;
+    margin-bottom: 8px;
+}
+
+.track-description {
+    font-size: 13px;
+    color: #231F20;
+    line-height: 1.5;
+    margin-bottom: 16px;
+    opacity: 0.7;
+}
+
+.track-meta {
+    display: flex;
+    gap: 15px;
+    font-size: 12px;
+    color: #231F20;
+    margin-bottom: 16px;
+    opacity: 0.6;
+}
+
+.track-meta span {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.rating-section {
+    margin: 16px 0;
+    padding: 16px 0;
+    border-top: 1px solid #D8F2D5;
+    border-bottom: 1px solid #D8F2D5;
+}
+
+.rating-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #231F20;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+    opacity: 0.6;
+}
+
+.star-rating {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 12px;
+}
+
+.star {
+    font-size: 20px;
+    color: #EFA63C;
+}
+
+.star.empty {
+    opacity: 0.3;
+}
+
+.rating-buttons {
+    display: flex;
+    gap: 12px;
+}
+
+.rating-button {
+    background: transparent;
+    border: 2px solid #1F4E23;
+    border-radius: 4px;
+    padding: 6px 14px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #1F4E23;
+}
+
+.rating-button:hover:not(:disabled) {
+    background: #D8F2D5;
+    transform: translateY(-1px);
+}
+
+.rating-button:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.rating-button.active.thumbs-up {
+    background: #1F4E23;
+    border-color: #1F4E23;
+    color: white;
+}
+
+.rating-button.active.thumbs-down {
+    background: #EFA63C;
+    border-color: #EFA63C;
+    color: white;
+}
+
+.rating-button .icon {
+    font-size: 16px;
+}
+
+.rating-button .count {
+    font-size: 12px;
+}
+
+.status {
+    font-size: 12px;
+    color: #38A29D;
+    margin-bottom: 12px;
+    font-weight: 600;
+}
+
+.status.playing {
+    color: #1F4E23;
+}
+
+.status.error {
+    color: #EFA63C;
+}
+
+.controls {
+    background: #231F20;
+    border-radius: 4px;
+    padding: 16px;
+    margin-top: 16px;
+}
+
+.control-bar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.play-button {
+    background: #38A29D;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    font-size: 18px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.play-button:hover:not(:disabled) {
+    background: #1F4E23;
+    transform: scale(1.05);
+}
+
+.play-button:active:not(:disabled) {
+    transform: scale(1.0);
+}
+
+.play-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.time-display {
+    color: #FFFFFF;
+    font-size: 13px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    min-width: 50px;
+    text-align: center;
+    flex-shrink: 0;
+    opacity: 0.9;
+}
+
+.volume-control {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+    min-width: 0;
+}
+
+.volume-icon {
+    color: #FFFFFF;
+    font-size: 16px;
+    flex-shrink: 0;
+    opacity: 0.9;
+}
+
+.volume-slider {
+    flex: 1;
+    height: 3px;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.2);
+    outline: none;
+    -webkit-appearance: none;
+    min-width: 80px;
+}
+
+.volume-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #38A29D;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border: none;
+}
+
+.volume-slider::-webkit-slider-thumb:hover {
+    transform: scale(1.2);
+    background: #1F4E23;
+}
+
+.volume-slider::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #38A29D;
+    cursor: pointer;
+    border: none;
+    transition: all 0.3s ease;
+}
+
+.volume-slider::-moz-range-thumb:hover {
+    transform: scale(1.2);
+    background: #1F4E23;
+}
+
+.volume-value {
+    color: #FFFFFF;
+    font-size: 12px;
+    font-weight: 500;
+    min-width: 35px;
+    text-align: right;
+    flex-shrink: 0;
+    opacity: 0.9;
+}
+
+.recently-played {
+    background: #D8F2D5;
+    padding: 32px 0;
+}
+
+.recently-played-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 24px;
+}
+
+.recently-played-header {
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: none;
+    letter-spacing: 0;
+    color: #231F20;
+    font-family: "Open Sans", sans-serif;
+    margin-bottom: 16px;
+}
+
+.history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.history-item {
+    padding: 8px 0;
+    background: transparent;
+    border-radius: 0;
+    border-left: none;
+    transition: all 0.2s ease;
+    color: #231F20;
+}
+
+.history-item:hover {
+    opacity: 0.7;
+}
+
+.history-track {
+    font-size: 13px;
+    font-weight: 600;
+    color: #231F20;
+    margin-bottom: 2px;
+}
+
+.history-artist {
+    font-size: 13px;
+    color: #231F20;
+    opacity: 0.7;
+}
+
+.loading-text {
+    color: #38A29D;
+    font-style: italic;
+    font-size: 13px;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+.status.loading::after {
+    content: '...';
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+/* Responsive Design */
+@media (max-width: 900px) {
+    .main-content {
+        grid-template-columns: 1fr;
+    }
+
+    .album-art-section {
+        padding: 24px;
+    }
+
+    .info-section {
+        padding: 24px 32px;
+    }
+
+    .track-artist {
+        font-size: 28px;
+    }
+}
+
+@media (max-width: 600px) {
+    .top-nav {
+        padding: 10px 16px;
+    }
+
+    .top-nav h1 {
+        font-size: 18px;
+    }
+
+    .album-art-section {
+        padding: 16px;
+    }
+
+    .info-section {
+        padding: 20px;
+    }
+
+    .track-artist {
+        font-size: 24px;
+    }
+
+    .track-title {
+        font-size: 18px;
+    }
+
+    .control-bar {
+        flex-wrap: wrap;
+    }
+
+    .volume-control {
+        flex: 1 1 100%;
+        margin-top: 12px;
+    }
+
+    .recently-played-inner {
+        padding: 0 16px;
+    }
+}

@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Radio Calico - Lossless HLS Stream</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700&family=Open+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <nav class="top-nav">
+        <img src="logo.png" alt="Radio Calico Logo" class="logo">
+        <h1>Radio Calico</h1>
+    </nav>
+
+    <div class="player-container">
+        <div class="main-content">
+            <div class="album-art-section">
+                <div class="album-art-wrapper">
+                    <img id="albumArt" src="https://d3d4yli4hf5bmh.cloudfront.net/cover.jpg" alt="Album Art" class="album-art">
+                </div>
+            </div>
+
+            <div class="info-section">
+                <div class="track-info-content">
+                    <div id="status" class="status">Loading...</div>
+                    <div class="track-artist" id="trackArtist">Loading...</div>
+                    <div class="track-title" id="trackTitle">24-bit / 48 kHz Lossless Stream</div>
+                    <div class="track-album" id="trackAlbum">Album info loading...</div>
+                    <div class="track-description" id="trackDescription">Crystal-clear audio quality, ad-free listening experience.</div>
+                    <div class="track-meta" id="trackMeta">
+                        <span>📅 <span id="trackDate">...</span></span>
+                        <span>🎵 <span id="trackQuality">24-bit / 48kHz</span></span>
+                    </div>
+
+                    <div class="rating-section">
+                        <div class="rating-label">Rate this track:</div>
+                        <div class="star-rating" id="starRating">
+                            <span class="star">★</span>
+                            <span class="star">★</span>
+                            <span class="star empty">★</span>
+                            <span class="star empty">★</span>
+                            <span class="star empty">★</span>
+                        </div>
+                        <div class="rating-buttons">
+                            <button class="rating-button thumbs-up" id="thumbsUpBtn">
+                                <span class="icon">👍</span>
+                                <span class="count" id="thumbsUpCount">-</span>
+                            </button>
+                            <button class="rating-button thumbs-down" id="thumbsDownBtn">
+                                <span class="icon">👎</span>
+                                <span class="count" id="thumbsDownCount">-</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="controls">
+                    <div class="control-bar">
+                        <button id="playButton" class="play-button">▶</button>
+                        <div class="time-display" id="timeDisplay">00:00</div>
+                        <div class="volume-control">
+                            <span class="volume-icon">🔊</span>
+                            <input
+                                type="range"
+                                id="volumeSlider"
+                                class="volume-slider"
+                                min="0"
+                                max="100"
+                                value="70"
+                            >
+                            <span id="volumeValue" class="volume-value">70%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="recently-played">
+        <div class="recently-played-inner">
+            <div class="recently-played-header">Previous tracks:</div>
+            <div id="recentlyPlayedContent" class="history-list">
+                <div class="loading-text">Loading history...</div>
+            </div>
+        </div>
+    </div>
+
+    <audio id="audioPlayer"></audio>
+
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <script src="app.js"></script>
+</body>
+</html>
