@@ -42,6 +42,15 @@ function initDatabase() {
       UNIQUE(song_id, user_id)
     );
 
+    CREATE TABLE IF NOT EXISTS song_star_ratings (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      song_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      rating INTEGER NOT NULL CHECK(rating >= 1 AND rating <= 5),
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(song_id, user_id)
+    );
+
     CREATE INDEX IF NOT EXISTS idx_ratings_song_id ON song_ratings(song_id);
   `);
 
@@ -142,6 +151,52 @@ function getUserRating(songId, userId) {
 }
 
 /**
+ * Submit or update a star rating (1-5)
+ * @param {string} songId - Unique identifier for the song
+ * @param {string} userId - Unique identifier for the user
+ * @param {number} rating - Rating value (1-5 stars)
+ */
+function submitStarRating(songId, userId, rating) {
+  const stmt = db.prepare(`
+    INSERT INTO song_star_ratings (song_id, user_id, rating)
+    VALUES (?, ?, ?)
+    ON CONFLICT(song_id, user_id) DO UPDATE SET rating = ?, created_at = CURRENT_TIMESTAMP
+  `);
+  const result = stmt.run(songId, userId, rating, rating);
+  return result.changes > 0;
+}
+
+/**
+ * Get star rating statistics for a song
+ * @param {string} songId - Unique identifier for the song
+ */
+function getStarRatings(songId) {
+  const stmt = db.prepare(`
+    SELECT
+      AVG(rating) as average_rating,
+      COUNT(*) as total_ratings
+    FROM song_star_ratings
+    WHERE song_id = ?
+  `);
+  const result = stmt.get(songId);
+  return {
+    average_rating: result.average_rating ? parseFloat(result.average_rating.toFixed(1)) : 0,
+    total_ratings: result.total_ratings || 0
+  };
+}
+
+/**
+ * Get user's star rating for a song
+ * @param {string} songId - Unique identifier for the song
+ * @param {string} userId - Unique identifier for the user
+ */
+function getUserStarRating(songId, userId) {
+  const stmt = db.prepare('SELECT rating FROM song_star_ratings WHERE song_id = ? AND user_id = ?');
+  const result = stmt.get(songId, userId);
+  return result ? result.rating : null;
+}
+
+/**
  * Test database connection
  */
 function testConnection() {
@@ -168,5 +223,8 @@ module.exports = {
   testConnection,
   submitRating,
   getRatings,
-  getUserRating
+  getUserRating,
+  submitStarRating,
+  getStarRatings,
+  getUserStarRating
 };

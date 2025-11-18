@@ -16,6 +16,7 @@ const thumbsDownBtn = document.getElementById('thumbsDownBtn');
 const thumbsUpCount = document.getElementById('thumbsUpCount');
 const thumbsDownCount = document.getElementById('thumbsDownCount');
 const recentlyPlayedContent = document.getElementById('recentlyPlayedContent');
+const starRatingContainer = document.getElementById('starRating');
 const streamUrl = 'https://d3d4yli4hf5bmh.cloudfront.net/hls/live.m3u8';
 const metadataUrl = 'https://d3d4yli4hf5bmh.cloudfront.net/metadatav2.json';
 const coverArtUrl = 'https://d3d4yli4hf5bmh.cloudfront.net/cover.jpg';
@@ -88,6 +89,7 @@ function updateNowPlaying(data) {
 
     // Load existing ratings
     loadRatings(songId);
+    loadStarRatings(songId);
 }
 
 // Update Recently Played widget
@@ -173,6 +175,91 @@ async function submitRatingRequest(songId, rating) {
     } catch (error) {
         console.error('Error submitting rating:', error);
     }
+}
+
+// Load star ratings for a song
+async function loadStarRatings(songId) {
+    try {
+        const userId = getUserId();
+        const response = await fetch(`/api/star-ratings/${encodeURIComponent(songId)}?userId=${encodeURIComponent(userId)}`);
+        const data = await response.json();
+
+        if (data.success) {
+            updateStarDisplay(data.data.userRating || 0);
+        }
+    } catch (error) {
+        console.error('Error loading star ratings:', error);
+    }
+}
+
+// Submit star rating
+async function submitStarRating(songId, rating) {
+    try {
+        const userId = getUserId();
+        const response = await fetch('/api/star-ratings', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ songId, userId, rating })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            updateStarDisplay(rating);
+        }
+    } catch (error) {
+        console.error('Error submitting star rating:', error);
+    }
+}
+
+// Update star display based on rating
+function updateStarDisplay(rating) {
+    const stars = starRatingContainer.querySelectorAll('.star');
+    stars.forEach((star, index) => {
+        if (index < rating) {
+            star.classList.remove('empty');
+        } else {
+            star.classList.add('empty');
+        }
+    });
+}
+
+// Setup star rating listeners (called once on init)
+function setupStarRatingListeners() {
+    const stars = starRatingContainer.querySelectorAll('.star');
+
+    // Hover effect - preview rating
+    stars.forEach((star, index) => {
+        star.addEventListener('mouseenter', function() {
+            stars.forEach((s, i) => {
+                if (i <= index) {
+                    s.classList.remove('empty');
+                } else {
+                    s.classList.add('empty');
+                }
+            });
+        });
+    });
+
+    // Reset on mouse leave
+    starRatingContainer.addEventListener('mouseleave', function() {
+        if (currentSongId) {
+            // Reload current rating
+            loadStarRatings(currentSongId);
+        }
+    });
+
+    // Click to set rating
+    stars.forEach((star, index) => {
+        star.addEventListener('click', function() {
+            if (currentSongId) {
+                const rating = index + 1;
+                submitStarRating(currentSongId, rating);
+            }
+        });
+    });
 }
 
 // Setup rating button listeners (called once on init)
@@ -335,6 +422,7 @@ audio.addEventListener('error', function(e) {
 // Initialize player on page load
 initPlayer();
 startMetadataUpdates();
+setupStarRatingListeners();
 
 // Cleanup on page unload
 window.addEventListener('beforeunload', function() {
