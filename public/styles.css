@@ -168,6 +168,13 @@ body {
 .star {
     font-size: 20px;
     color: #EFA63C;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    user-select: none;
+}
+
+.star:hover {
+    transform: scale(1.15);
 }
 
 .star.empty {

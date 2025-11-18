@@ -1,7 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const path = require('path');
-const { testConnection, getAllUsers, createUser, getAllPosts, createPost, submitRating, getRatings, getUserRating } = require('./database');
+const { testConnection, getAllUsers, createUser, getAllPosts, createPost, submitRating, getRatings, getUserRating, submitStarRating, getStarRatings, getUserStarRating } = require('./database');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -159,6 +159,46 @@ app.get('/api/ratings/:songId', (req, res) => {
 
     const ratings = getRatings(songId);
     const userRating = userId ? getUserRating(songId, userId) : null;
+
+    res.json({
+      success: true,
+      data: {
+        ...ratings,
+        userRating
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Star rating endpoints
+app.post('/api/star-ratings', (req, res) => {
+  try {
+    const { songId, userId, rating } = req.body;
+    if (!songId || !userId || !rating || rating < 1 || rating > 5) {
+      return res.status(400).json({
+        success: false,
+        error: 'Song ID, user ID, and rating (1-5) are required'
+      });
+    }
+    const success = submitStarRating(songId, userId, rating);
+    res.json({
+      success,
+      message: success ? 'Star rating submitted successfully' : 'Star rating submission failed'
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.get('/api/star-ratings/:songId', (req, res) => {
+  try {
+    const { songId } = req.params;
+    const { userId } = req.query;
+
+    const ratings = getStarRatings(songId);
+    const userRating = userId ? getUserStarRating(songId, userId) : null;
 
     res.json({
       success: true,
