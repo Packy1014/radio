@@ -176,7 +176,7 @@ app.get('/api/ratings/:songId', (req, res) => {
 app.post('/api/star-ratings', (req, res) => {
   try {
     const { songId, userId, rating } = req.body;
-    if (!songId || !userId || !rating || rating < 1 || rating > 5) {
+    if (!songId || !userId || typeof rating !== 'number' || !Number.isInteger(rating) || rating < 1 || rating > 5) {
       return res.status(400).json({
         success: false,
         error: 'Song ID, user ID, and rating (1-5) are required'
