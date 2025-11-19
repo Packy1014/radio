@@ -1,6 +1,6 @@
 # Radio Streaming Web Application
 
-A modern web-based radio streaming application featuring live audio playback, song ratings, and metadata display. Built with Node.js and vanilla JavaScript.
+A modern web-based radio streaming application featuring live audio playback, song ratings, and metadata display. Built with Node.js and vanilla JavaScript, fully containerized with Docker for easy deployment.
 
 ## Features
 
@@ -11,6 +11,7 @@ A modern web-based radio streaming application featuring live audio playback, so
 - **User Management**: User accounts and authentication
 - **Responsive Design**: Mobile-friendly interface with custom styling
 - **Comprehensive Testing**: 136 automated tests covering backend and frontend
+- **Docker Deployment**: Self-contained deployment with development and production configurations
 
 ## Tech Stack
 
@@ -33,6 +34,13 @@ A modern web-based radio streaming application featuring live audio playback, so
 - **Test Environment**: Node.js for backend, jsdom for frontend
 - **Coverage**: 136 tests across 6 test suites
 
+### Deployment
+- **Containerization**: Docker with multi-stage builds
+- **Orchestration**: Docker Compose for dev and production
+- **Base Image**: Node.js 20 Alpine (minimal footprint)
+- **Production Size**: ~150MB optimized image
+- **Security**: Non-root user, resource limits, health checks
+
 ## Project Structure
 
 ```
@@ -41,7 +49,12 @@ radio/
 ├── database.js            # SQLite database setup and queries
 ├── package.json           # Dependencies and scripts
 ├── jest.config.js         # Jest test configuration
-├── .env                   # Environment configuration
+├── Dockerfile             # Multi-stage Docker build (dev/prod/test)
+├── docker-compose.yml     # Development Docker configuration
+├── docker-compose.prod.yml  # Production Docker configuration
+├── .dockerignore          # Docker build exclusions
+├── .env.example           # Environment variable template
+├── .env                   # Environment configuration (not in git)
 ├── .gitignore            # Git ignore rules
 ├── RadioCalicoStyle/     # Brand assets and style guide
 │   ├── RadioCalico_style_Guide.txt
@@ -68,11 +81,21 @@ radio/
 
 ## Getting Started
 
+You can run this application either natively with Node.js or using Docker containers.
+
 ### Prerequisites
+
+**Option 1: Native Node.js**
 - Node.js (v14 or higher recommended)
 - npm or yarn
 
+**Option 2: Docker (Recommended for deployment)**
+- Docker (v20.10+)
+- Docker Compose (v2.0+)
+
 ### Installation
+
+**Native Node.js Setup:**
 
 1. Clone the repository:
 ```bash
@@ -100,15 +123,41 @@ npm run dev
 
 5. Open your browser to http://localhost:3000
 
+**Docker Setup:**
+
+1. Clone the repository:
+```bash
+git clone https://github.com/Packy1014/radio.git
+cd radio
+```
+
+2. Start with Docker Compose:
+```bash
+# Development (with live reload)
+npm run docker:dev
+
+# OR Production (optimized, detached)
+npm run docker:prod
+```
+
+3. Open your browser to http://localhost:3000
+
+See the [Docker Deployment](#docker-deployment-1) section below for detailed documentation, configuration options, and troubleshooting.
+
 ### Running Tests
 
-Run the complete test suite:
+**Native Node.js:**
 ```bash
 npm test                  # Run all 136 tests
 npm run test:watch        # Watch mode for development
 npm run test:coverage     # Generate coverage report
 npm run test:backend      # Run only backend tests (68 tests)
 npm run test:frontend     # Run only frontend tests (68 tests)
+```
+
+**Docker:**
+```bash
+npm run docker:test       # Run all tests in isolated container
 ```
 
 ## API Endpoints
@@ -366,6 +415,344 @@ This application follows the Radio Calico brand guidelines:
 - Logo: `RadioCalicoStyle/RadioCalicoLogoTM.png`
 - Fonts: Montserrat (headings), Open Sans (body)
 - Custom color scheme per brand specifications
+
+## Docker Deployment
+
+### Overview
+
+The application is fully containerized and can be deployed using Docker with separate configurations for development and production environments. The Docker setup uses multi-stage builds, health checks, and volume persistence for the SQLite database.
+
+### Prerequisites
+
+- Docker (v20.10+)
+- Docker Compose (v2.0+)
+
+### Quick Start
+
+**Option 1: Development Container (with live reload)**
+```bash
+npm run docker:dev
+```
+This starts the application in development mode with:
+- Live code reloading via volume mounts
+- Full access to development tools
+- Database persisted in `radio-data-dev` volume
+- Access at http://localhost:3000
+
+**Option 2: Production Container**
+```bash
+npm run docker:prod
+```
+This starts the application in production mode with:
+- Optimized image size
+- Non-root user for security
+- Resource limits (1 CPU, 512MB RAM)
+- Database persisted in `radio-data-prod` volume
+- Runs in detached mode
+- Automatic restart on failure
+
+### Docker Commands Reference
+
+```bash
+# Development
+npm run docker:dev              # Start development container
+npm run docker:dev:down         # Stop development container
+
+# Production
+npm run docker:prod             # Start production container (detached)
+npm run docker:prod:down        # Stop production container
+npm run docker:prod:logs        # View production logs (follow mode)
+
+# Testing
+npm run docker:test             # Run tests in container
+
+# Cleanup
+npm run docker:clean            # Remove all containers and volumes
+```
+
+### Manual Docker Commands
+
+If you prefer direct Docker commands:
+
+**Development:**
+```bash
+docker-compose up --build
+docker-compose down
+docker-compose logs -f
+```
+
+**Production:**
+```bash
+docker-compose -f docker-compose.prod.yml up --build -d
+docker-compose -f docker-compose.prod.yml down
+docker-compose -f docker-compose.prod.yml logs -f
+```
+
+**Build specific stages:**
+```bash
+# Build production image
+docker build --target production -t radio-app:latest .
+
+# Build and run tests
+docker build --target test -t radio-test .
+docker run --rm radio-test
+```
+
+### Architecture
+
+The Dockerfile uses **multi-stage builds** with the following stages:
+
+1. **base** - Common package.json layer
+2. **dependencies** - Full dependency installation
+3. **development** - Development environment with dev dependencies
+4. **prod-dependencies** - Production-only dependencies
+5. **production** - Optimized production image
+6. **test** - Isolated testing environment
+
+**Benefits:**
+- Smaller production images (~200MB Alpine-based)
+- Faster builds through layer caching
+- Separate dev/prod dependencies
+- Dedicated test environment
+
+### Environment Variables
+
+Create a `.env` file from the template:
+```bash
+cp .env.example .env
+```
+
+Default values:
+```
+PORT=3000
+NODE_ENV=development
+DATABASE_PATH=./data.db
+```
+
+Docker Compose automatically loads the `.env` file.
+
+### Volume Persistence
+
+The SQLite database is persisted using Docker volumes:
+
+**Development:**
+- Volume: `radio-data-dev`
+- Mount: `/app/data`
+
+**Production:**
+- Volume: `radio-data-prod`
+- Mount: `/app/data`
+
+**Manage volumes:**
+```bash
+# List volumes
+docker volume ls
+
+# Inspect volume
+docker volume inspect radio-data-prod
+
+# Remove volume (⚠️ data loss!)
+docker volume rm radio-data-prod
+```
+
+**Backup database:**
+```bash
+# Backup production database
+docker run --rm \
+  -v radio-data-prod:/data \
+  -v $(pwd):/backup \
+  alpine cp /data/data.db /backup/backup-$(date +%Y%m%d).db
+
+# Restore database
+docker run --rm \
+  -v radio-data-prod:/data \
+  -v $(pwd):/backup \
+  alpine cp /backup/backup-20231201.db /data/data.db
+```
+
+### Health Checks
+
+Both containers include health checks:
+- **Endpoint**: `GET /api/test`
+- **Interval**: 30 seconds
+- **Timeout**: 3 seconds
+- **Retries**: 3
+
+Check container health:
+```bash
+docker ps                              # View health status
+docker inspect radio-streaming-prod    # Detailed health info
+```
+
+### Production Features
+
+The production container includes:
+
+**Security:**
+- Runs as non-root user (`nodejs`, UID 1001)
+- Read-only application code
+- Minimal Alpine Linux base image
+
+**Resource Management:**
+- CPU limit: 1.0 cores
+- Memory limit: 512MB
+- Memory reservation: 256MB
+
+**Logging:**
+- JSON file driver
+- Max log size: 10MB
+- Max log files: 3 (rotation)
+
+**Reliability:**
+- Automatic restart on failure
+- Health checks every 30 seconds
+
+### Development Features
+
+The development container includes:
+
+**Live Reload:**
+- Source code mounted as volumes
+- Changes reflected immediately
+- No rebuild required
+
+**Full Tool Access:**
+- All devDependencies installed
+- Testing tools available
+- Debugging capabilities
+
+### Deployment Scenarios
+
+**Single Server:**
+```bash
+# SSH into server
+ssh user@server
+
+# Clone repository
+git clone https://github.com/Packy1014/radio.git
+cd radio
+
+# Start production container
+npm run docker:prod
+
+# Container runs in background with auto-restart
+```
+
+**With Reverse Proxy (Nginx):**
+```bash
+# docker-compose.prod.yml with custom port
+PORT=3001 npm run docker:prod
+
+# Nginx config
+# proxy_pass http://localhost:3001;
+```
+
+**Docker Swarm:**
+```bash
+docker stack deploy -c docker-compose.prod.yml radio-stack
+```
+
+**Kubernetes:**
+Convert docker-compose to Kubernetes manifests using Kompose:
+```bash
+kompose convert -f docker-compose.prod.yml
+kubectl apply -f .
+```
+
+### Troubleshooting
+
+**Container won't start:**
+```bash
+# Check logs
+docker-compose logs radio-dev
+docker logs radio-streaming-prod
+
+# Check container details
+docker inspect radio-streaming-prod
+```
+
+**Port already in use:**
+```bash
+# Change port in docker-compose.yml or via environment
+PORT=3001 npm run docker:prod
+
+# Or stop conflicting service
+sudo lsof -i :3000
+kill <PID>
+```
+
+**Database permission issues:**
+```bash
+# Remove volume and restart
+npm run docker:clean
+npm run docker:prod
+```
+
+**Out of disk space:**
+```bash
+# Clean up Docker resources
+docker system prune -a
+docker volume prune
+```
+
+**Cannot connect to database:**
+```bash
+# Verify volume exists
+docker volume inspect radio-data-prod
+
+# Check file permissions inside container
+docker exec radio-streaming-prod ls -la /app/data
+```
+
+**Memory issues:**
+```bash
+# Increase memory limit in docker-compose.prod.yml
+# Change: memory: 1G
+npm run docker:prod:down
+npm run docker:prod
+```
+
+### Performance Optimization
+
+**Build Performance:**
+```bash
+# Use BuildKit for faster builds
+DOCKER_BUILDKIT=1 docker build .
+
+# Parallel builds
+docker-compose build --parallel
+```
+
+**Runtime Performance:**
+```bash
+# Monitor resource usage
+docker stats radio-streaming-prod
+
+# Check logs for performance issues
+npm run docker:prod:logs | grep -i "slow\|error"
+```
+
+### CI/CD Integration
+
+Run tests in CI pipeline:
+```yaml
+# GitHub Actions example
+- name: Run Docker tests
+  run: npm run docker:test
+```
+
+Build and push to registry:
+```bash
+# Build production image
+docker build --target production -t username/radio-app:latest .
+
+# Push to Docker Hub
+docker push username/radio-app:latest
+
+# Deploy on server
+docker pull username/radio-app:latest
+docker run -d -p 3000:3000 username/radio-app:latest
+```
 
 ## Contributing
 

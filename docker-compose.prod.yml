@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  # Radio application - Production mode
+  radio:
+    container_name: radio-streaming-prod
+    build:
+      context: .
+      target: production
+      dockerfile: Dockerfile
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DATABASE_PATH=/app/data/data.db
+    volumes:
+      # Mount data directory for database persistence
+      - radio-data-prod:/app/data:rw
+    restart: always
+    networks:
+      - radio-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/api/test', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+volumes:
+  # Named volume for database persistence
+  radio-data-prod:
+    driver: local
+
+networks:
+  radio-network:
+    driver: bridge
