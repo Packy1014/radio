@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  # Radio application - Development mode
+  radio-dev:
+    container_name: radio-streaming-dev
+    build:
+      context: .
+      target: development
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - DATABASE_PATH=/app/data/data.db
+    volumes:
+      # Mount source code for live reload (excludes node_modules)
+      - ./server.js:/app/server.js:ro
+      - ./database.js:/app/database.js:ro
+      - ./public:/app/public:ro
+      - ./RadioCalicoStyle:/app/RadioCalicoStyle:ro
+      # Mount data directory for database persistence
+      - radio-data-dev:/app/data
+      # Mount node_modules as volume to prevent host/container conflicts
+      - /app/node_modules
+    restart: unless-stopped
+    networks:
+      - radio-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/api/test', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+volumes:
+  # Named volume for database persistence
+  radio-data-dev:
+    driver: local
+
+networks:
+  radio-network:
+    driver: bridge

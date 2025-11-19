@@ -10,7 +10,14 @@
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "test:backend": "jest --selectProjects backend",
-    "test:frontend": "jest --selectProjects frontend"
+    "test:frontend": "jest --selectProjects frontend",
+    "docker:dev": "docker-compose up --build",
+    "docker:dev:down": "docker-compose down",
+    "docker:prod": "docker-compose -f docker-compose.prod.yml up --build -d",
+    "docker:prod:down": "docker-compose -f docker-compose.prod.yml down",
+    "docker:prod:logs": "docker-compose -f docker-compose.prod.yml logs -f",
+    "docker:test": "docker build --target test -t radio-test . && docker run --rm radio-test",
+    "docker:clean": "docker-compose down -v && docker-compose -f docker-compose.prod.yml down -v"
   },
   "keywords": [],
   "author": "",

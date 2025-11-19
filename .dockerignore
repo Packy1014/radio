@@ -1,0 +1,58 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Node
+node_modules
+npm-debug.log
+yarn-error.log
+
+# Environment files (will be provided at runtime)
+.env
+.env.local
+.env.*.local
+
+# Database files (use volumes instead)
+*.db
+*.db-shm
+*.db-wal
+data/
+
+# Testing
+coverage
+.nyc_output
+
+# Documentation
+README.md
+CLAUDE.md
+*.md
+
+# CI/CD
+.github
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Logs
+logs
+*.log
+
+# Temporary files
+tmp
+temp
+.cache
+
+# Build artifacts
+dist
+build

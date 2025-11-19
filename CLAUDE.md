@@ -22,15 +22,40 @@ npm run test:backend      # Run only backend tests (68 tests)
 npm run test:frontend     # Run only frontend tests (68 tests)
 ```
 
+Run with Docker:
+```bash
+# Development (with live reload)
+npm run docker:dev        # Start development container
+npm run docker:dev:down   # Stop development container
+
+# Production
+npm run docker:prod       # Start production container (detached)
+npm run docker:prod:down  # Stop production container
+npm run docker:prod:logs  # View production logs
+
+# Testing
+npm run docker:test       # Run tests in container
+
+# Cleanup
+npm run docker:clean      # Remove all containers and volumes
+```
+
 ## Architecture Overview
 
-This is a radio streaming web application with a Node.js backend and vanilla JavaScript frontend.
+This is a radio streaming web application with a Node.js backend and vanilla JavaScript frontend, fully containerized with Docker for self-contained deployment.
 
 ### Backend Stack
 - **Server**: Express.js (v5.1.0) web server
 - **Database**: SQLite with better-sqlite3 driver
 - **Environment**: CommonJS modules (not ES modules)
 - **Configuration**: dotenv for environment variables
+
+### Deployment Stack
+- **Containerization**: Docker with multi-stage builds
+- **Development**: Docker Compose with volume mounts for live reload
+- **Production**: Optimized Alpine-based image (~150MB)
+- **Security**: Non-root user, resource limits, health checks
+- **Orchestration**: Docker Compose for both dev and production environments
 
 ### Style Guide
 - A text version of the styling guide for the webpage is at ./RadioCalicoStyle/RadioCalico_style_Guide.txt
@@ -39,6 +64,11 @@ This is a radio streaming web application with a Node.js backend and vanilla Jav
 ### Project Structure
 - `server.js` - Express application entry point with API routes
 - `database.js` - SQLite database connection, schema initialization, and data access functions
+- `Dockerfile` - Multi-stage Docker build (base, dependencies, development, production, test)
+- `docker-compose.yml` - Development Docker Compose configuration
+- `docker-compose.prod.yml` - Production Docker Compose configuration
+- `.dockerignore` - Docker build context exclusions
+- `.env.example` - Environment variable template
 - `public/` - Static frontend files
   - `index.html` - Main HTML structure
   - `styles.css` - All CSS styling
@@ -76,6 +106,7 @@ Key patterns:
 - All database functions are exported from `database.js` and imported into route handlers
 - Use prepared statements for all queries (already implemented)
 - Tests use in-memory SQLite databases (`:memory:`) for isolation and speed
+- Docker deployments use volume mounts for database persistence (`radio-data-dev` or `radio-data-prod`)
 
 ### API Endpoints
 
@@ -140,6 +171,16 @@ The frontend follows a clean separation of concerns:
 - **HTML changes**: Edit `public/index.html` for structural changes only
 - **Style changes**: Edit `public/styles.css` for all visual styling
 - **JavaScript changes**: Edit `public/app.js` for all application logic and behavior
+- Write corresponding tests in `__tests__/frontend/`
+
+### Docker Development Workflow
+When developing with Docker:
+- **Development mode**: Use `npm run docker:dev` for live reload via volume mounts
+- **Code changes**: Automatically reflected without rebuild (server.js, database.js, public/)
+- **Dependency changes**: Require rebuild with `docker-compose up --build`
+- **Testing in Docker**: Use `npm run docker:test` to run tests in isolated container
+- **Database persistence**: Data persists in `radio-data-dev` volume across container restarts
+- **Production testing**: Use `npm run docker:prod` to test production build locally
 
 ### Static Files
 Files in `public/` are served directly via `express.static('public')`. The root route `/` serves `public/index.html`, which links to `styles.css` and `app.js`.
@@ -213,3 +254,203 @@ Configure in `.env`:
 - `PORT` - Server port (default: 3000)
 - `DATABASE_PATH` - SQLite database file path (default: ./data.db)
 - `NODE_ENV` - Environment mode (development/production)
+
+## Docker Deployment
+
+### Overview
+
+The application is fully containerized with Docker support for both development and production environments. The Docker setup uses multi-stage builds for optimized image sizes and includes health checks for reliability.
+
+### Quick Start
+
+**Development (with live reload):**
+```bash
+npm run docker:dev
+# Access at http://localhost:3000
+```
+
+**Production:**
+```bash
+npm run docker:prod
+# Access at http://localhost:3000
+```
+
+### Docker Architecture
+
+**Multi-stage Build:**
+- `base` - Common dependencies layer
+- `dependencies` - Full dependency installation
+- `development` - Dev environment with all dependencies and volume mounts
+- `prod-dependencies` - Production-only dependencies
+- `production` - Optimized production image with non-root user
+- `test` - Isolated testing environment
+
+**Key Features:**
+- Health checks on `/api/test` endpoint
+- Volume persistence for SQLite database
+- Non-root user for production security
+- Resource limits (1 CPU, 512MB RAM in production)
+- Log rotation (10MB max, 3 files)
+- Live reload in development via volume mounts
+
+### Docker Files
+
+- `Dockerfile` - Multi-stage Dockerfile with dev/prod/test targets
+- `docker-compose.yml` - Development configuration with volume mounts
+- `docker-compose.prod.yml` - Production configuration with resource limits
+- `.dockerignore` - Excludes unnecessary files from build context
+
+### Development Workflow
+
+1. **Start development container:**
+   ```bash
+   npm run docker:dev
+   ```
+   - Mounts source code for live reload
+   - Database persisted in `radio-data-dev` volume
+   - Access at http://localhost:3000
+
+2. **View logs:**
+   ```bash
+   docker-compose logs -f radio-dev
+   ```
+
+3. **Stop container:**
+   ```bash
+   npm run docker:dev:down
+   ```
+
+### Production Deployment
+
+1. **Build and start:**
+   ```bash
+   npm run docker:prod
+   ```
+   - Runs in detached mode
+   - Database persisted in `radio-data-prod` volume
+   - Automatic restart on failure
+
+2. **View logs:**
+   ```bash
+   npm run docker:prod:logs
+   ```
+
+3. **Stop container:**
+   ```bash
+   npm run docker:prod:down
+   ```
+
+### Direct Docker Commands
+
+**Development:**
+```bash
+docker-compose up --build                    # Start dev container
+docker-compose down                          # Stop dev container
+docker-compose logs -f                       # View logs
+```
+
+**Production:**
+```bash
+docker-compose -f docker-compose.prod.yml up --build -d    # Start prod
+docker-compose -f docker-compose.prod.yml down            # Stop prod
+docker-compose -f docker-compose.prod.yml logs -f         # View logs
+```
+
+**Testing:**
+```bash
+docker build --target test -t radio-test .   # Build test image
+docker run --rm radio-test                   # Run tests
+```
+
+**Cleanup:**
+```bash
+npm run docker:clean                         # Remove all containers and volumes
+docker system prune -a                       # Clean all Docker resources
+```
+
+### Volume Management
+
+**Development volume:**
+```bash
+docker volume ls                             # List volumes
+docker volume inspect radio-data-dev         # Inspect dev volume
+docker volume rm radio-data-dev              # Remove dev volume (data loss!)
+```
+
+**Production volume:**
+```bash
+docker volume inspect radio-data-prod        # Inspect prod volume
+docker volume rm radio-data-prod             # Remove prod volume (data loss!)
+```
+
+**Backup database:**
+```bash
+docker run --rm -v radio-data-prod:/data -v $(pwd):/backup alpine \
+  cp /data/data.db /backup/backup-$(date +%Y%m%d).db
+```
+
+### Environment Configuration
+
+Create `.env` file from template:
+```bash
+cp .env.example .env
+# Edit .env as needed
+```
+
+Docker Compose will automatically load `.env` file for environment variables.
+
+### Health Checks
+
+Both development and production containers include health checks:
+- **Endpoint**: `GET /api/test`
+- **Interval**: 30 seconds
+- **Timeout**: 3 seconds
+- **Retries**: 3
+- **Start period**: 5s (dev) / 10s (prod)
+
+Check container health:
+```bash
+docker ps                                    # View health status
+docker inspect radio-streaming-prod          # Detailed health info
+```
+
+### Security Notes
+
+**Production container:**
+- Runs as non-root user (`nodejs:nodejs`, UID 1001)
+- Read-only source code
+- Minimal attack surface (Alpine Linux base)
+- Resource limits prevent DoS
+
+**Development container:**
+- Root access for development flexibility
+- Volume mounts for live reload
+- Not suitable for production use
+
+### Troubleshooting
+
+**Container won't start:**
+```bash
+docker-compose logs radio-dev               # Check logs
+docker inspect radio-streaming-dev          # Check container details
+```
+
+**Database permission issues:**
+```bash
+# Ensure volume has correct permissions
+docker-compose down
+docker volume rm radio-data-dev
+docker-compose up --build
+```
+
+**Port already in use:**
+```bash
+# Change port in docker-compose.yml or .env
+PORT=3001 npm run docker:prod
+```
+
+**Clean slate:**
+```bash
+npm run docker:clean                        # Remove containers and volumes
+docker system prune -a                      # Remove all Docker resources
+```
