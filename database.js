@@ -1,107 +1,261 @@
 require('dotenv').config();
-const Database = require('better-sqlite3');
-const path = require('path');
 
-// Database connection
-const dbPath = process.env.DATABASE_PATH || './data.db';
-const db = new Database(dbPath, { verbose: console.log });
+// Determine database type from environment
+const DATABASE_TYPE = process.env.DATABASE_TYPE || 'sqlite';
 
-// Enable foreign keys
-db.pragma('foreign_keys = ON');
+let dbInstance;
+
+if (DATABASE_TYPE === 'postgres') {
+  // PostgreSQL setup
+  const { Pool } = require('pg');
+
+  dbInstance = new Pool({
+    host: process.env.POSTGRES_HOST || 'localhost',
+    port: process.env.POSTGRES_PORT || 5432,
+    database: process.env.POSTGRES_DB || 'radio',
+    user: process.env.POSTGRES_USER || 'radio',
+    password: process.env.POSTGRES_PASSWORD || 'radio',
+  });
+
+  console.log('✓ Using PostgreSQL database');
+} else {
+  // SQLite setup
+  const Database = require('better-sqlite3');
+  const dbPath = process.env.DATABASE_PATH || './data.db';
+  dbInstance = new Database(dbPath, { verbose: console.log });
+
+  // Enable foreign keys for SQLite
+  dbInstance.pragma('foreign_keys = ON');
+
+  console.log('✓ Using SQLite database');
+}
 
 /**
- * Initialize database with example schema
+ * Execute a query (abstraction layer for both SQLite and PostgreSQL)
  */
-function initDatabase() {
-  // Create users table as an example
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS users (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      username TEXT NOT NULL UNIQUE,
-      email TEXT NOT NULL UNIQUE,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
+async function query(sql, params = []) {
+  if (DATABASE_TYPE === 'postgres') {
+    // Convert ? placeholders to $1, $2, etc. for PostgreSQL
+    let paramIndex = 1;
+    const pgSql = sql.replace(/\?/g, () => `$${paramIndex++}`);
+    const result = await dbInstance.query(pgSql, params);
+    return result.rows;
+  } else {
+    // SQLite - wrap synchronous calls in promises
+    return new Promise((resolve, reject) => {
+      try {
+        const stmt = dbInstance.prepare(sql);
+        const result = stmt.all(...params);
+        resolve(result);
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+}
 
-    CREATE TABLE IF NOT EXISTS posts (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id INTEGER NOT NULL,
-      title TEXT NOT NULL,
-      content TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-    );
+/**
+ * Execute a query and return a single row
+ */
+async function queryOne(sql, params = []) {
+  if (DATABASE_TYPE === 'postgres') {
+    let paramIndex = 1;
+    const pgSql = sql.replace(/\?/g, () => `$${paramIndex++}`);
+    const result = await dbInstance.query(pgSql, params);
+    return result.rows[0] || null;
+  } else {
+    return new Promise((resolve, reject) => {
+      try {
+        const stmt = dbInstance.prepare(sql);
+        const result = stmt.get(...params);
+        resolve(result || null);
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+}
 
-    CREATE INDEX IF NOT EXISTS idx_posts_user_id ON posts(user_id);
+/**
+ * Execute an INSERT/UPDATE/DELETE and return affected rows
+ */
+async function execute(sql, params = []) {
+  if (DATABASE_TYPE === 'postgres') {
+    let paramIndex = 1;
+    const pgSql = sql.replace(/\?/g, () => `$${paramIndex++}`);
+    const result = await dbInstance.query(pgSql, params);
+    return {
+      changes: result.rowCount,
+      lastInsertRowid: result.rows[0]?.id || null
+    };
+  } else {
+    return new Promise((resolve, reject) => {
+      try {
+        const stmt = dbInstance.prepare(sql);
+        const result = stmt.run(...params);
+        resolve({
+          changes: result.changes,
+          lastInsertRowid: result.lastInsertRowid
+        });
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+}
 
-    CREATE TABLE IF NOT EXISTS song_ratings (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      song_id TEXT NOT NULL,
-      user_id TEXT NOT NULL,
-      rating INTEGER NOT NULL CHECK(rating IN (1, -1)),
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE(song_id, user_id)
-    );
+/**
+ * Initialize database with schema
+ */
+async function initDatabase() {
+  try {
+    if (DATABASE_TYPE === 'postgres') {
+      // PostgreSQL schema
+      await dbInstance.query(`
+        CREATE TABLE IF NOT EXISTS users (
+          id SERIAL PRIMARY KEY,
+          username TEXT NOT NULL UNIQUE,
+          email TEXT NOT NULL UNIQUE,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
 
-    CREATE TABLE IF NOT EXISTS song_star_ratings (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      song_id TEXT NOT NULL,
-      user_id TEXT NOT NULL,
-      rating INTEGER NOT NULL CHECK(rating >= 1 AND rating <= 5),
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE(song_id, user_id)
-    );
+        CREATE TABLE IF NOT EXISTS posts (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL,
+          title TEXT NOT NULL,
+          content TEXT,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        );
 
-    CREATE INDEX IF NOT EXISTS idx_ratings_song_id ON song_ratings(song_id);
-  `);
+        CREATE INDEX IF NOT EXISTS idx_posts_user_id ON posts(user_id);
 
-  console.log('✓ Database initialized successfully');
+        CREATE TABLE IF NOT EXISTS song_ratings (
+          id SERIAL PRIMARY KEY,
+          song_id TEXT NOT NULL,
+          user_id TEXT NOT NULL,
+          rating INTEGER NOT NULL CHECK(rating IN (1, -1)),
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(song_id, user_id)
+        );
+
+        CREATE TABLE IF NOT EXISTS song_star_ratings (
+          id SERIAL PRIMARY KEY,
+          song_id TEXT NOT NULL,
+          user_id TEXT NOT NULL,
+          rating INTEGER NOT NULL CHECK(rating >= 1 AND rating <= 5),
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(song_id, user_id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_ratings_song_id ON song_ratings(song_id);
+      `);
+    } else {
+      // SQLite schema
+      dbInstance.exec(`
+        CREATE TABLE IF NOT EXISTS users (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          username TEXT NOT NULL UNIQUE,
+          email TEXT NOT NULL UNIQUE,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE TABLE IF NOT EXISTS posts (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER NOT NULL,
+          title TEXT NOT NULL,
+          content TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_posts_user_id ON posts(user_id);
+
+        CREATE TABLE IF NOT EXISTS song_ratings (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          song_id TEXT NOT NULL,
+          user_id TEXT NOT NULL,
+          rating INTEGER NOT NULL CHECK(rating IN (1, -1)),
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(song_id, user_id)
+        );
+
+        CREATE TABLE IF NOT EXISTS song_star_ratings (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          song_id TEXT NOT NULL,
+          user_id TEXT NOT NULL,
+          rating INTEGER NOT NULL CHECK(rating >= 1 AND rating <= 5),
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(song_id, user_id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_ratings_song_id ON song_ratings(song_id);
+      `);
+    }
+
+    console.log('✓ Database initialized successfully');
+  } catch (error) {
+    console.error('✗ Database initialization failed:', error);
+    throw error;
+  }
 }
 
 /**
  * Get all users
  */
-function getAllUsers() {
-  const stmt = db.prepare('SELECT * FROM users ORDER BY created_at DESC');
-  return stmt.all();
+async function getAllUsers() {
+  return await query('SELECT * FROM users ORDER BY created_at DESC');
 }
 
 /**
  * Get user by ID
  */
-function getUserById(id) {
-  const stmt = db.prepare('SELECT * FROM users WHERE id = ?');
-  return stmt.get(id);
+async function getUserById(id) {
+  return await queryOne('SELECT * FROM users WHERE id = ?', [id]);
 }
 
 /**
  * Create a new user
  */
-function createUser(username, email) {
-  const stmt = db.prepare('INSERT INTO users (username, email) VALUES (?, ?)');
-  const result = stmt.run(username, email);
-  return result.lastInsertRowid;
+async function createUser(username, email) {
+  if (DATABASE_TYPE === 'postgres') {
+    const result = await dbInstance.query(
+      'INSERT INTO users (username, email) VALUES ($1, $2) RETURNING id',
+      [username, email]
+    );
+    return result.rows[0].id;
+  } else {
+    const result = await execute('INSERT INTO users (username, email) VALUES (?, ?)', [username, email]);
+    return result.lastInsertRowid;
+  }
 }
 
 /**
  * Get all posts with user information
  */
-function getAllPosts() {
-  const stmt = db.prepare(`
+async function getAllPosts() {
+  return await query(`
     SELECT posts.*, users.username
     FROM posts
     JOIN users ON posts.user_id = users.id
     ORDER BY posts.created_at DESC
   `);
-  return stmt.all();
 }
 
 /**
  * Create a new post
  */
-function createPost(userId, title, content) {
-  const stmt = db.prepare('INSERT INTO posts (user_id, title, content) VALUES (?, ?, ?)');
-  const result = stmt.run(userId, title, content);
-  return result.lastInsertRowid;
+async function createPost(userId, title, content) {
+  if (DATABASE_TYPE === 'postgres') {
+    const result = await dbInstance.query(
+      'INSERT INTO posts (user_id, title, content) VALUES ($1, $2, $3) RETURNING id',
+      [userId, title, content]
+    );
+    return result.rows[0].id;
+  } else {
+    const result = await execute('INSERT INTO posts (user_id, title, content) VALUES (?, ?, ?)', [userId, title, content]);
+    return result.lastInsertRowid;
+  }
 }
 
 /**
@@ -110,32 +264,40 @@ function createPost(userId, title, content) {
  * @param {string} userId - Unique identifier for the user
  * @param {number} rating - Rating value (1 for thumbs up, -1 for thumbs down)
  */
-function submitRating(songId, userId, rating) {
-  const stmt = db.prepare(`
-    INSERT INTO song_ratings (song_id, user_id, rating)
-    VALUES (?, ?, ?)
-    ON CONFLICT(song_id, user_id) DO UPDATE SET rating = ?, created_at = CURRENT_TIMESTAMP
-  `);
-  const result = stmt.run(songId, userId, rating, rating);
-  return result.changes > 0;
+async function submitRating(songId, userId, rating) {
+  if (DATABASE_TYPE === 'postgres') {
+    const result = await dbInstance.query(`
+      INSERT INTO song_ratings (song_id, user_id, rating)
+      VALUES ($1, $2, $3)
+      ON CONFLICT(song_id, user_id) DO UPDATE SET rating = $3, created_at = CURRENT_TIMESTAMP
+    `, [songId, userId, rating]);
+    return result.rowCount > 0;
+  } else {
+    const result = await execute(`
+      INSERT INTO song_ratings (song_id, user_id, rating)
+      VALUES (?, ?, ?)
+      ON CONFLICT(song_id, user_id) DO UPDATE SET rating = ?, created_at = CURRENT_TIMESTAMP
+    `, [songId, userId, rating, rating]);
+    return result.changes > 0;
+  }
 }
 
 /**
  * Get rating counts for a song
  * @param {string} songId - Unique identifier for the song
  */
-function getRatings(songId) {
-  const stmt = db.prepare(`
+async function getRatings(songId) {
+  const result = await queryOne(`
     SELECT
       SUM(CASE WHEN rating = 1 THEN 1 ELSE 0 END) as thumbs_up,
       SUM(CASE WHEN rating = -1 THEN 1 ELSE 0 END) as thumbs_down
     FROM song_ratings
     WHERE song_id = ?
-  `);
-  const result = stmt.get(songId);
+  `, [songId]);
+
   return {
-    thumbs_up: result.thumbs_up || 0,
-    thumbs_down: result.thumbs_down || 0
+    thumbs_up: parseInt(result?.thumbs_up) || 0,
+    thumbs_down: parseInt(result?.thumbs_down) || 0
   };
 }
 
@@ -144,9 +306,8 @@ function getRatings(songId) {
  * @param {string} songId - Unique identifier for the song
  * @param {string} userId - Unique identifier for the user
  */
-function getUserRating(songId, userId) {
-  const stmt = db.prepare('SELECT rating FROM song_ratings WHERE song_id = ? AND user_id = ?');
-  const result = stmt.get(songId, userId);
+async function getUserRating(songId, userId) {
+  const result = await queryOne('SELECT rating FROM song_ratings WHERE song_id = ? AND user_id = ?', [songId, userId]);
   return result ? result.rating : null;
 }
 
@@ -156,32 +317,40 @@ function getUserRating(songId, userId) {
  * @param {string} userId - Unique identifier for the user
  * @param {number} rating - Rating value (1-5 stars)
  */
-function submitStarRating(songId, userId, rating) {
-  const stmt = db.prepare(`
-    INSERT INTO song_star_ratings (song_id, user_id, rating)
-    VALUES (?, ?, ?)
-    ON CONFLICT(song_id, user_id) DO UPDATE SET rating = ?, created_at = CURRENT_TIMESTAMP
-  `);
-  const result = stmt.run(songId, userId, rating, rating);
-  return result.changes > 0;
+async function submitStarRating(songId, userId, rating) {
+  if (DATABASE_TYPE === 'postgres') {
+    const result = await dbInstance.query(`
+      INSERT INTO song_star_ratings (song_id, user_id, rating)
+      VALUES ($1, $2, $3)
+      ON CONFLICT(song_id, user_id) DO UPDATE SET rating = $3, created_at = CURRENT_TIMESTAMP
+    `, [songId, userId, rating]);
+    return result.rowCount > 0;
+  } else {
+    const result = await execute(`
+      INSERT INTO song_star_ratings (song_id, user_id, rating)
+      VALUES (?, ?, ?)
+      ON CONFLICT(song_id, user_id) DO UPDATE SET rating = ?, created_at = CURRENT_TIMESTAMP
+    `, [songId, userId, rating, rating]);
+    return result.changes > 0;
+  }
 }
 
 /**
  * Get star rating statistics for a song
  * @param {string} songId - Unique identifier for the song
  */
-function getStarRatings(songId) {
-  const stmt = db.prepare(`
+async function getStarRatings(songId) {
+  const result = await queryOne(`
     SELECT
       AVG(rating) as average_rating,
       COUNT(*) as total_ratings
     FROM song_star_ratings
     WHERE song_id = ?
-  `);
-  const result = stmt.get(songId);
+  `, [songId]);
+
   return {
-    average_rating: result.average_rating ? parseFloat(result.average_rating.toFixed(1)) : 0,
-    total_ratings: result.total_ratings || 0
+    average_rating: result?.average_rating ? parseFloat(parseFloat(result.average_rating).toFixed(1)) : 0,
+    total_ratings: parseInt(result?.total_ratings) || 0
   };
 }
 
@@ -190,30 +359,36 @@ function getStarRatings(songId) {
  * @param {string} songId - Unique identifier for the song
  * @param {string} userId - Unique identifier for the user
  */
-function getUserStarRating(songId, userId) {
-  const stmt = db.prepare('SELECT rating FROM song_star_ratings WHERE song_id = ? AND user_id = ?');
-  const result = stmt.get(songId, userId);
+async function getUserStarRating(songId, userId) {
+  const result = await queryOne('SELECT rating FROM song_star_ratings WHERE song_id = ? AND user_id = ?', [songId, userId]);
   return result ? result.rating : null;
 }
 
 /**
  * Test database connection
  */
-function testConnection() {
+async function testConnection() {
   try {
-    const result = db.prepare('SELECT 1 as test').get();
-    return { success: true, message: 'Database connection successful', result };
+    if (DATABASE_TYPE === 'postgres') {
+      await dbInstance.query('SELECT 1 as test');
+    } else {
+      dbInstance.prepare('SELECT 1 as test').get();
+    }
+    return { success: true, message: 'Database connection successful' };
   } catch (error) {
     return { success: false, message: error.message };
   }
 }
 
 // Initialize database on first run
-initDatabase();
+initDatabase().catch(err => {
+  console.error('Failed to initialize database:', err);
+  process.exit(1);
+});
 
 // Export database instance and helper functions
 module.exports = {
-  db,
+  db: dbInstance,
   initDatabase,
   getAllUsers,
   getUserById,
