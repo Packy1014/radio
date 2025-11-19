@@ -4,6 +4,42 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Development Commands
 
+### Quick Start with Make
+
+The project includes a comprehensive Makefile for easy workflow management:
+
+```bash
+make help                 # Show all available commands
+
+# Development
+make dev                  # Start development environment
+make stop                 # Stop development environment
+make logs                 # View development logs
+make test                 # Run all tests
+
+# Production
+make prod                 # Start production (nginx + backend + PostgreSQL)
+make prod-down            # Stop production
+make prod-logs            # View all production logs
+make health               # Check service health
+
+# Testing
+make test                 # Run all 136 tests
+make test-watch           # Run tests in watch mode
+make test-coverage        # Run tests with coverage
+
+# Database
+make backup-dev           # Backup development SQLite database
+make backup-prod          # Backup production PostgreSQL database
+make db-shell-prod        # Connect to PostgreSQL shell
+
+# Cleanup
+make clean                # Remove containers (keeps data)
+make clean-all            # Remove everything (⚠️  data loss!)
+```
+
+### Native Node.js Commands
+
 Start the development server:
 ```bash
 npm start
@@ -22,7 +58,8 @@ npm run test:backend      # Run only backend tests (68 tests)
 npm run test:frontend     # Run only frontend tests (68 tests)
 ```
 
-Run with Docker:
+### Docker Commands (npm scripts)
+
 ```bash
 # Development (with live reload)
 npm run docker:dev        # Start development container
@@ -45,16 +82,26 @@ npm run docker:clean      # Remove all containers and volumes
 This is a radio streaming web application with a Node.js backend and vanilla JavaScript frontend, fully containerized with Docker for self-contained deployment.
 
 ### Backend Stack
-- **Server**: Express.js (v5.1.0) web server
-- **Database**: SQLite with better-sqlite3 driver
+- **Server**: Express.js (v5.1.0) web server with async/await route handlers
+- **Database**:
+  - **Development/Testing**: SQLite with better-sqlite3 driver
+  - **Production**: PostgreSQL 16 with pg (node-postgres) driver
+  - Unified async API abstraction supporting both databases
 - **Environment**: CommonJS modules (not ES modules)
 - **Configuration**: dotenv for environment variables
+- **Dependencies**: express (v5.1.0), pg (v8.13.1), better-sqlite3 (v12.4.1)
 
 ### Deployment Stack
 - **Containerization**: Docker with multi-stage builds
-- **Development**: Docker Compose with volume mounts for live reload
-- **Production**: Optimized Alpine-based image (~150MB)
-- **Security**: Non-root user, resource limits, health checks
+- **Development**:
+  - Docker Compose with SQLite and volume mounts for live reload
+  - Single Node.js container serving both API and static files
+- **Production**:
+  - **Frontend**: nginx (1.25-alpine) serving static files with gzip compression
+  - **Backend**: Node.js API server (~150MB Alpine-based image)
+  - **Database**: PostgreSQL 16 (Alpine) with persistent volume storage
+  - Multi-container architecture with service networking
+- **Security**: Non-root user, resource limits, health checks, read-only mounts
 - **Orchestration**: Docker Compose for both dev and production environments
 
 ### Style Guide
@@ -62,11 +109,13 @@ This is a radio streaming web application with a Node.js backend and vanilla Jav
 - The Radio Calico logo is at ./RadioCalicoStyle/RadioCalicoLogoTM.png
 
 ### Project Structure
-- `server.js` - Express application entry point with API routes
-- `database.js` - SQLite database connection, schema initialization, and data access functions
+- `server.js` - Express application entry point with async API routes
+- `database.js` - Database abstraction layer supporting both SQLite and PostgreSQL
+- `Makefile` - Build automation with targets for dev, prod, test, and utilities
+- `nginx.conf` - nginx configuration for production frontend (static files, API proxy, compression)
 - `Dockerfile` - Multi-stage Docker build (base, dependencies, development, production, test)
-- `docker-compose.yml` - Development Docker Compose configuration
-- `docker-compose.prod.yml` - Production Docker Compose configuration
+- `docker-compose.yml` - Development Docker Compose configuration (SQLite, single container)
+- `docker-compose.prod.yml` - Production Docker Compose configuration (PostgreSQL, nginx, backend)
 - `.dockerignore` - Docker build context exclusions
 - `.env.example` - Environment variable template
 - `public/` - Static frontend files
@@ -93,20 +142,30 @@ This is a radio streaming web application with a Node.js backend and vanilla Jav
 
 ### Database Architecture
 
-The database uses better-sqlite3 (synchronous API) with four main tables:
+The application supports **dual database backends** with a unified async API:
+- **SQLite** (development/testing) - File-based with better-sqlite3 driver
+- **PostgreSQL** (production) - Server-based with pg (node-postgres) driver
 
+The database type is determined by the `DATABASE_TYPE` environment variable.
+
+**Schema** (four main tables):
 1. **users** - User accounts with username/email
 2. **posts** - User-generated posts with foreign key to users
 3. **song_ratings** - Song ratings (thumbs up/down) with unique constraint on (song_id, user_id)
 4. **song_star_ratings** - Star ratings (1-5) with unique constraint on (song_id, user_id)
 
-Key patterns:
-- Foreign keys are enabled via `db.pragma('foreign_keys = ON')`
-- Database initialization happens automatically on require via `initDatabase()`
-- All database functions are exported from `database.js` and imported into route handlers
-- Use prepared statements for all queries (already implemented)
-- Tests use in-memory SQLite databases (`:memory:`) for isolation and speed
-- Docker deployments use volume mounts for database persistence (`radio-data-dev` or `radio-data-prod`)
+**Key patterns:**
+- All database functions use async/await for consistency across both databases
+- `database.js` provides abstraction layer that handles SQL syntax differences:
+  - Parameter placeholders: `?` → `$1, $2, ...` conversion for PostgreSQL
+  - AUTO_INCREMENT (SQLite) → SERIAL (PostgreSQL)
+  - ON CONFLICT syntax handling
+- Foreign keys are enabled (SQLite: `pragma`, PostgreSQL: native support)
+- Database initialization happens automatically via `initDatabase()` async function
+- All queries use prepared statements for SQL injection prevention
+- **Testing**: Uses in-memory SQLite (`:memory:`) for isolation and speed
+- **Development**: SQLite with file persistence in `radio-data-dev` Docker volume
+- **Production**: PostgreSQL with data in `postgres-data` Docker volume
 
 ### API Endpoints
 
@@ -159,12 +218,29 @@ Edit `database.js` in the `initDatabase()` function. The function runs on every 
 
 ### Adding API Routes
 Add routes in `server.js`. All routes should:
+- Use `async` function handlers with `await` for database calls
 - Use try/catch for error handling
 - Return JSON with `{ success: boolean, ... }` structure
 - Validate required fields and return 400 for missing data
 - Validate data types (use `typeof` and `Number.isInteger()` for numeric fields)
 - Return 500 for server errors
 - Add corresponding tests in `__tests__/backend/`
+
+Example pattern:
+```javascript
+app.post('/api/endpoint', async (req, res) => {
+  try {
+    const { field } = req.body;
+    if (!field) {
+      return res.status(400).json({ success: false, error: 'Field required' });
+    }
+    const result = await databaseFunction(field);
+    res.json({ success: true, data: result });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+```
 
 ### Modifying Frontend Files
 The frontend follows a clean separation of concerns:
@@ -251,9 +327,23 @@ When adding features:
 ## Environment Variables
 
 Configure in `.env`:
+
+**Server Configuration:**
 - `PORT` - Server port (default: 3000)
+- `NODE_ENV` - Environment mode (development/production/test)
+
+**Database Configuration:**
+- `DATABASE_TYPE` - Database type: `sqlite` (default) or `postgres`
+
+**SQLite (Development/Testing):**
 - `DATABASE_PATH` - SQLite database file path (default: ./data.db)
-- `NODE_ENV` - Environment mode (development/production)
+
+**PostgreSQL (Production):**
+- `POSTGRES_HOST` - PostgreSQL host (default: localhost, Docker: postgres)
+- `POSTGRES_PORT` - PostgreSQL port (default: 5432)
+- `POSTGRES_DB` - Database name (default: radio)
+- `POSTGRES_USER` - Database user (default: radio)
+- `POSTGRES_PASSWORD` - Database password (default: radio, change in production!)
 
 ## Docker Deployment
 
@@ -322,23 +412,54 @@ npm run docker:prod
 
 ### Production Deployment
 
+Production uses a **multi-container architecture**:
+- **nginx** - Frontend web server (port 80, exposed as 3000)
+- **radio-backend** - Node.js API server
+- **postgres** - PostgreSQL 16 database
+
+**Architecture:**
+```
+[Client] → [nginx:80] → [radio-backend:3000] → [postgres:5432]
+             ↓
+         Static Files
+```
+
 1. **Build and start:**
    ```bash
    npm run docker:prod
    ```
-   - Runs in detached mode
-   - Database persisted in `radio-data-prod` volume
+   - Starts all three services in detached mode
+   - nginx serves static files and proxies `/api/*` to backend
+   - Backend uses PostgreSQL for data persistence
+   - PostgreSQL data persisted in `postgres-data` volume
    - Automatic restart on failure
+   - Health checks for all services
 
 2. **View logs:**
    ```bash
-   npm run docker:prod:logs
+   npm run docker:prod:logs          # All services
+   docker logs radio-nginx           # nginx only
+   docker logs radio-backend-prod    # Backend only
+   docker logs radio-postgres        # PostgreSQL only
    ```
 
-3. **Stop container:**
+3. **Access application:**
+   - **Frontend**: http://localhost:3000 (served by nginx)
+   - **API**: http://localhost:3000/api/test (proxied to backend)
+   - **Health**: http://localhost:3000/health (nginx health check)
+
+4. **Stop containers:**
    ```bash
    npm run docker:prod:down
    ```
+
+**Production Features:**
+- nginx with gzip compression and static file caching
+- PostgreSQL for robust data persistence
+- Service health monitoring
+- Resource limits (CPU/memory)
+- Non-root user for backend security
+- Read-only file mounts where applicable
 
 ### Direct Docker Commands
 
@@ -370,23 +491,34 @@ docker system prune -a                       # Clean all Docker resources
 
 ### Volume Management
 
-**Development volume:**
+**Development volume (SQLite):**
 ```bash
 docker volume ls                             # List volumes
 docker volume inspect radio-data-dev         # Inspect dev volume
 docker volume rm radio-data-dev              # Remove dev volume (data loss!)
 ```
 
-**Production volume:**
+**Production volume (PostgreSQL):**
 ```bash
-docker volume inspect radio-data-prod        # Inspect prod volume
-docker volume rm radio-data-prod             # Remove prod volume (data loss!)
+docker volume inspect postgres-data          # Inspect prod volume
+docker volume rm postgres-data               # Remove prod volume (data loss!)
 ```
 
-**Backup database:**
+**Backup databases:**
+
+SQLite (development):
 ```bash
-docker run --rm -v radio-data-prod:/data -v $(pwd):/backup alpine \
-  cp /data/data.db /backup/backup-$(date +%Y%m%d).db
+docker run --rm -v radio-data-dev:/data -v $(pwd):/backup alpine \
+  cp /data/data.db /backup/backup-dev-$(date +%Y%m%d).db
+```
+
+PostgreSQL (production):
+```bash
+# Using pg_dump
+docker exec radio-postgres pg_dump -U radio radio > backup-prod-$(date +%Y%m%d).sql
+
+# Restore from backup
+docker exec -i radio-postgres psql -U radio radio < backup-prod-$(date).sql
 ```
 
 ### Environment Configuration

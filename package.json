@@ -26,7 +26,8 @@
   "dependencies": {
     "better-sqlite3": "^12.4.1",
     "dotenv": "^17.2.3",
-    "express": "^5.1.0"
+    "express": "^5.1.0",
+    "pg": "^8.13.1"
   },
   "devDependencies": {
     "@testing-library/dom": "^9.3.3",

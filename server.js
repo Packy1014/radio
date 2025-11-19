@@ -81,28 +81,28 @@ app.get('/api/test', (req, res) => {
 });
 
 // Database test endpoint
-app.get('/api/db-test', (req, res) => {
-  const result = testConnection();
+app.get('/api/db-test', async (req, res) => {
+  const result = await testConnection();
   res.json(result);
 });
 
 // User endpoints
-app.get('/api/users', (req, res) => {
+app.get('/api/users', async (req, res) => {
   try {
-    const users = getAllUsers();
+    const users = await getAllUsers();
     res.json({ success: true, data: users });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-app.post('/api/users', (req, res) => {
+app.post('/api/users', async (req, res) => {
   try {
     const { username, email } = req.body;
     if (!username || !email) {
       return res.status(400).json({ success: false, error: 'Username and email are required' });
     }
-    const userId = createUser(username, email);
+    const userId = await createUser(username, email);
     res.json({ success: true, userId, message: 'User created successfully' });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -110,22 +110,22 @@ app.post('/api/users', (req, res) => {
 });
 
 // Post endpoints
-app.get('/api/posts', (req, res) => {
+app.get('/api/posts', async (req, res) => {
   try {
-    const posts = getAllPosts();
+    const posts = await getAllPosts();
     res.json({ success: true, data: posts });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-app.post('/api/posts', (req, res) => {
+app.post('/api/posts', async (req, res) => {
   try {
     const { userId, title, content } = req.body;
     if (!userId || !title) {
       return res.status(400).json({ success: false, error: 'User ID and title are required' });
     }
-    const postId = createPost(userId, title, content);
+    const postId = await createPost(userId, title, content);
     res.json({ success: true, postId, message: 'Post created successfully' });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -133,7 +133,7 @@ app.post('/api/posts', (req, res) => {
 });
 
 // Rating endpoints
-app.post('/api/ratings', (req, res) => {
+app.post('/api/ratings', async (req, res) => {
   try {
     const { songId, userId, rating } = req.body;
     if (!songId || !userId || (rating !== 1 && rating !== -1)) {
@@ -142,7 +142,7 @@ app.post('/api/ratings', (req, res) => {
         error: 'Song ID, user ID, and rating (1 or -1) are required'
       });
     }
-    const success = submitRating(songId, userId, rating);
+    const success = await submitRating(songId, userId, rating);
     res.json({
       success,
       message: success ? 'Rating submitted successfully' : 'Rating submission failed'
@@ -152,13 +152,13 @@ app.post('/api/ratings', (req, res) => {
   }
 });
 
-app.get('/api/ratings/:songId', (req, res) => {
+app.get('/api/ratings/:songId', async (req, res) => {
   try {
     const { songId } = req.params;
     const { userId } = req.query;
 
-    const ratings = getRatings(songId);
-    const userRating = userId ? getUserRating(songId, userId) : null;
+    const ratings = await getRatings(songId);
+    const userRating = userId ? await getUserRating(songId, userId) : null;
 
     res.json({
       success: true,
@@ -173,7 +173,7 @@ app.get('/api/ratings/:songId', (req, res) => {
 });
 
 // Star rating endpoints
-app.post('/api/star-ratings', (req, res) => {
+app.post('/api/star-ratings', async (req, res) => {
   try {
     const { songId, userId, rating } = req.body;
     if (!songId || !userId || typeof rating !== 'number' || !Number.isInteger(rating) || rating < 1 || rating > 5) {
@@ -182,7 +182,7 @@ app.post('/api/star-ratings', (req, res) => {
         error: 'Song ID, user ID, and rating (1-5) are required'
       });
     }
-    const success = submitStarRating(songId, userId, rating);
+    const success = await submitStarRating(songId, userId, rating);
     res.json({
       success,
       message: success ? 'Star rating submitted successfully' : 'Star rating submission failed'
@@ -192,13 +192,13 @@ app.post('/api/star-ratings', (req, res) => {
   }
 });
 
-app.get('/api/star-ratings/:songId', (req, res) => {
+app.get('/api/star-ratings/:songId', async (req, res) => {
   try {
     const { songId } = req.params;
     const { userId } = req.query;
 
-    const ratings = getStarRatings(songId);
-    const userRating = userId ? getUserStarRating(songId, userId) : null;
+    const ratings = await getStarRatings(songId);
+    const userRating = userId ? await getUserStarRating(songId, userId) : null;
 
     res.json({
       success: true,

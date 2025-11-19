@@ -1,27 +1,87 @@
 version: '3.8'
 
 services:
-  # Radio application - Production mode
-  radio:
-    container_name: radio-streaming-prod
+  # PostgreSQL database - Production
+  postgres:
+    container_name: radio-postgres
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-radio}
+      - POSTGRES_USER=${POSTGRES_USER:-radio}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-radio}
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - radio-network
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-radio}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
+  # Backend API - Production
+  radio-backend:
+    container_name: radio-backend-prod
     build:
       context: .
       target: production
       dockerfile: Dockerfile
-    ports:
-      - "${PORT:-3000}:3000"
     environment:
       - NODE_ENV=production
       - PORT=3000
-      - DATABASE_PATH=/app/data/data.db
-    volumes:
-      # Mount data directory for database persistence
-      - radio-data-prod:/app/data:rw
-    restart: always
+      - DATABASE_TYPE=postgres
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=${POSTGRES_DB:-radio}
+      - POSTGRES_USER=${POSTGRES_USER:-radio}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-radio}
     networks:
       - radio-network
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/api/test', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+  # Nginx frontend - Production
+  nginx:
+    container_name: radio-nginx
+    image: nginx:1.25-alpine
+    ports:
+      - "${PORT:-80}:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./public:/usr/share/nginx/html:ro
+    networks:
+      - radio-network
+    restart: always
+    depends_on:
+      - radio-backend
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
       interval: 30s
       timeout: 3s
       retries: 3
@@ -34,15 +94,15 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '1.0'
-          memory: 512M
-        reservations:
           cpus: '0.5'
-          memory: 256M
+          memory: 128M
+        reservations:
+          cpus: '0.1'
+          memory: 32M
 
 volumes:
-  # Named volume for database persistence
-  radio-data-prod:
+  # PostgreSQL data volume
+  postgres-data:
     driver: local
 
 networks:

@@ -12,14 +12,20 @@ A modern web-based radio streaming application featuring live audio playback, so
 - **Responsive Design**: Mobile-friendly interface with custom styling
 - **Comprehensive Testing**: 136 automated tests covering backend and frontend
 - **Docker Deployment**: Self-contained deployment with development and production configurations
+- **Dual Database Support**: SQLite for development/testing, PostgreSQL for production
+- **Production-Ready**: nginx web server with gzip compression and API proxying
 
 ## Tech Stack
 
 ### Backend
-- **Server**: Express.js (v5.1.0)
-- **Database**: SQLite with better-sqlite3 driver
-- **Runtime**: Node.js
+- **Server**: Express.js (v5.1.0) with async/await handlers
+- **Database**:
+  - **Development/Testing**: SQLite with better-sqlite3 driver
+  - **Production**: PostgreSQL 16 with pg (node-postgres) driver
+  - Unified async API abstraction layer
+- **Runtime**: Node.js 20
 - **Configuration**: dotenv for environment variables
+- **Dependencies**: express, pg, better-sqlite3, dotenv
 
 ### Frontend
 - **Audio Streaming**: hls.js for HLS playback
@@ -37,21 +43,27 @@ A modern web-based radio streaming application featuring live audio playback, so
 ### Deployment
 - **Containerization**: Docker with multi-stage builds
 - **Orchestration**: Docker Compose for dev and production
-- **Base Image**: Node.js 20 Alpine (minimal footprint)
-- **Production Size**: ~150MB optimized image
-- **Security**: Non-root user, resource limits, health checks
+- **Development**: Single container (Node.js + SQLite)
+- **Production**: Multi-container architecture:
+  - nginx 1.25-alpine for frontend (~10MB)
+  - Node.js 20 Alpine backend (~150MB)
+  - PostgreSQL 16 Alpine database
+- **Security**: Non-root user, resource limits, health checks, read-only mounts
+- **Features**: gzip compression, static file caching, API proxying
 
 ## Project Structure
 
 ```
 radio/
-├── server.js              # Express application and API routes
-├── database.js            # SQLite database setup and queries
+├── server.js              # Express application and async API routes
+├── database.js            # Database abstraction (SQLite/PostgreSQL)
+├── Makefile               # Build automation (make dev, make prod, make test)
+├── nginx.conf             # nginx configuration for production
 ├── package.json           # Dependencies and scripts
 ├── jest.config.js         # Jest test configuration
 ├── Dockerfile             # Multi-stage Docker build (dev/prod/test)
-├── docker-compose.yml     # Development Docker configuration
-├── docker-compose.prod.yml  # Production Docker configuration
+├── docker-compose.yml     # Development Docker configuration (SQLite)
+├── docker-compose.prod.yml  # Production Docker config (PostgreSQL + nginx)
 ├── .dockerignore          # Docker build exclusions
 ├── .env.example           # Environment variable template
 ├── .env                   # Environment configuration (not in git)
@@ -81,15 +93,45 @@ radio/
 
 ## Getting Started
 
-You can run this application either natively with Node.js or using Docker containers.
+### Quick Start with Makefile
+
+The easiest way to get started is using the provided Makefile:
+
+```bash
+# Clone the repository
+git clone https://github.com/Packy1014/radio.git
+cd radio
+
+# View all available commands
+make help
+
+# Start development environment (with live reload)
+make dev
+
+# OR start production environment (nginx + PostgreSQL)
+make prod
+
+# Run all tests
+make test
+
+# Check service health
+make health
+```
+
+See the full list of commands by running `make help`.
 
 ### Prerequisites
 
-**Option 1: Native Node.js**
+**Option 1: Using Makefile (Recommended)**
+- Docker (v20.10+)
+- Docker Compose (v2.0+)
+- make (usually pre-installed on macOS/Linux)
+
+**Option 2: Native Node.js**
 - Node.js (v14 or higher recommended)
 - npm or yarn
 
-**Option 2: Docker (Recommended for deployment)**
+**Option 3: Docker (Manual)**
 - Docker (v20.10+)
 - Docker Compose (v2.0+)
 
@@ -416,11 +458,86 @@ This application follows the Radio Calico brand guidelines:
 - Fonts: Montserrat (headings), Open Sans (body)
 - Custom color scheme per brand specifications
 
+## Environment Variables
+
+The application uses environment variables for configuration. Create a `.env` file from the template:
+
+```bash
+cp .env.example .env
+```
+
+### Configuration Options
+
+**Server Settings:**
+- `PORT` - HTTP server port (default: 3000)
+- `NODE_ENV` - Environment mode: `development`, `production`, or `test`
+
+**Database Settings:**
+- `DATABASE_TYPE` - Database backend: `sqlite` (default) or `postgres`
+
+**SQLite Configuration (Development/Testing):**
+```bash
+DATABASE_TYPE=sqlite
+DATABASE_PATH=./data.db
+```
+
+**PostgreSQL Configuration (Production):**
+```bash
+DATABASE_TYPE=postgres
+POSTGRES_HOST=localhost        # Use 'postgres' in Docker Compose
+POSTGRES_PORT=5432
+POSTGRES_DB=radio
+POSTGRES_USER=radio
+POSTGRES_PASSWORD=your_secure_password
+```
+
+### Usage Examples
+
+**Development with SQLite:**
+```bash
+# .env
+PORT=3000
+NODE_ENV=development
+DATABASE_TYPE=sqlite
+DATABASE_PATH=./data.db
+```
+
+**Production with PostgreSQL:**
+```bash
+# .env
+PORT=3000
+NODE_ENV=production
+DATABASE_TYPE=postgres
+POSTGRES_HOST=postgres
+POSTGRES_PORT=5432
+POSTGRES_DB=radio
+POSTGRES_USER=radio
+POSTGRES_PASSWORD=strong_password_here
+```
+
+**Docker Compose:**
+Docker Compose automatically reads the `.env` file and applies variables to all services. For production, ensure you set a strong `POSTGRES_PASSWORD`.
+
 ## Docker Deployment
 
 ### Overview
 
-The application is fully containerized and can be deployed using Docker with separate configurations for development and production environments. The Docker setup uses multi-stage builds, health checks, and volume persistence for the SQLite database.
+The application is fully containerized with different architectures for development and production:
+
+**Development:**
+- Single Node.js container
+- SQLite database with file persistence
+- Live code reloading via volume mounts
+- Direct API and static file serving
+
+**Production:**
+- Multi-container architecture:
+  - **nginx**: Frontend web server (static files, gzip, caching)
+  - **radio-backend**: Node.js API server
+  - **postgres**: PostgreSQL 16 database
+- Service networking with health checks
+- Volume persistence for PostgreSQL data
+- Resource limits and security hardening
 
 ### Prerequisites
 
@@ -439,17 +556,21 @@ This starts the application in development mode with:
 - Database persisted in `radio-data-dev` volume
 - Access at http://localhost:3000
 
-**Option 2: Production Container**
+**Option 2: Production Containers**
 ```bash
 npm run docker:prod
 ```
-This starts the application in production mode with:
-- Optimized image size
-- Non-root user for security
-- Resource limits (1 CPU, 512MB RAM)
-- Database persisted in `radio-data-prod` volume
+This starts a multi-container production environment with:
+- **nginx** web server serving static files on port 80 (exposed as 3000)
+- **Node.js backend** API server with async handlers
+- **PostgreSQL 16** database with persistent storage
+- nginx gzip compression and static file caching
+- API request proxying from nginx to backend
+- Service health checks and auto-restart
+- Resource limits per service
+- Non-root user for backend security
+- PostgreSQL data persisted in `postgres-data` volume
 - Runs in detached mode
-- Automatic restart on failure
 
 ### Docker Commands Reference
 
@@ -515,97 +636,128 @@ The Dockerfile uses **multi-stage builds** with the following stages:
 - Separate dev/prod dependencies
 - Dedicated test environment
 
-### Environment Variables
-
-Create a `.env` file from the template:
-```bash
-cp .env.example .env
-```
-
-Default values:
-```
-PORT=3000
-NODE_ENV=development
-DATABASE_PATH=./data.db
-```
-
-Docker Compose automatically loads the `.env` file.
-
 ### Volume Persistence
 
-The SQLite database is persisted using Docker volumes:
+Databases are persisted using Docker volumes:
 
-**Development:**
+**Development (SQLite):**
 - Volume: `radio-data-dev`
 - Mount: `/app/data`
+- Database file: `data.db`
 
-**Production:**
-- Volume: `radio-data-prod`
-- Mount: `/app/data`
+**Production (PostgreSQL):**
+- Volume: `postgres-data`
+- Mount: `/var/lib/postgresql/data`
+- Database: PostgreSQL cluster data
 
 **Manage volumes:**
 ```bash
 # List volumes
 docker volume ls
 
-# Inspect volume
-docker volume inspect radio-data-prod
+# Inspect volumes
+docker volume inspect radio-data-dev     # Development (SQLite)
+docker volume inspect postgres-data      # Production (PostgreSQL)
 
 # Remove volume (⚠️ data loss!)
-docker volume rm radio-data-prod
+docker volume rm radio-data-dev
+docker volume rm postgres-data
 ```
 
-**Backup database:**
-```bash
-# Backup production database
-docker run --rm \
-  -v radio-data-prod:/data \
-  -v $(pwd):/backup \
-  alpine cp /data/data.db /backup/backup-$(date +%Y%m%d).db
+**Backup databases:**
 
-# Restore database
+SQLite (Development):
+```bash
+# Backup
 docker run --rm \
-  -v radio-data-prod:/data \
+  -v radio-data-dev:/data \
   -v $(pwd):/backup \
-  alpine cp /backup/backup-20231201.db /data/data.db
+  alpine cp /data/data.db /backup/backup-dev-$(date +%Y%m%d).db
+
+# Restore
+docker run --rm \
+  -v radio-data-dev:/data \
+  -v $(pwd):/backup \
+  alpine cp /backup/backup-dev-20231201.db /data/data.db
+```
+
+PostgreSQL (Production):
+```bash
+# Backup using pg_dump
+docker exec radio-postgres pg_dump -U radio radio > backup-prod-$(date +%Y%m%d).sql
+
+# Restore from backup
+docker exec -i radio-postgres psql -U radio radio < backup-prod-20231201.sql
 ```
 
 ### Health Checks
 
-Both containers include health checks:
-- **Endpoint**: `GET /api/test`
-- **Interval**: 30 seconds
-- **Timeout**: 3 seconds
-- **Retries**: 3
+All production containers include health checks:
+
+**nginx:**
+- Endpoint: `GET /health`
+- Interval: 30 seconds
+- Timeout: 3 seconds
+- Retries: 3
+
+**radio-backend:**
+- Endpoint: `GET /api/test`
+- Interval: 30 seconds
+- Timeout: 3 seconds
+- Retries: 3
+- Start period: 40 seconds (waits for PostgreSQL)
+
+**postgres:**
+- Command: `pg_isready`
+- Interval: 10 seconds
+- Timeout: 5 seconds
+- Retries: 5
 
 Check container health:
 ```bash
-docker ps                              # View health status
-docker inspect radio-streaming-prod    # Detailed health info
+docker ps                           # View all container health status
+docker inspect radio-nginx          # nginx health info
+docker inspect radio-backend-prod   # Backend health info
+docker inspect radio-postgres       # PostgreSQL health info
 ```
 
 ### Production Features
 
-The production container includes:
+The production deployment includes:
 
-**Security:**
-- Runs as non-root user (`nodejs`, UID 1001)
+**Architecture:**
+- Multi-container setup (nginx + backend + PostgreSQL)
+- Service networking with health checks
+- nginx reverse proxy for API requests
+- Static file serving with caching
+
+**nginx Container:**
+- gzip compression enabled
+- Static file caching (1 year for assets)
+- API proxying to backend
+- Resource limits: 0.5 CPU, 128MB RAM
+
+**Backend Container:**
+- Non-root user (`nodejs`, UID 1001)
 - Read-only application code
-- Minimal Alpine Linux base image
+- Minimal Alpine Linux base
+- Resource limits: 1.0 CPU, 512MB RAM
 
-**Resource Management:**
-- CPU limit: 1.0 cores
-- Memory limit: 512MB
-- Memory reservation: 256MB
+**PostgreSQL Container:**
+- PostgreSQL 16 Alpine
+- Persistent volume storage
+- Resource limits: 1.0 CPU, 512MB RAM
+- Health monitoring via pg_isready
 
 **Logging:**
-- JSON file driver
+- JSON file driver (nginx only, others use Docker default)
 - Max log size: 10MB
 - Max log files: 3 (rotation)
 
 **Reliability:**
-- Automatic restart on failure
-- Health checks every 30 seconds
+- Automatic restart on failure (all services)
+- Health checks for all containers
+- Service dependencies (backend waits for PostgreSQL)
 
 ### Development Features
 
@@ -752,6 +904,121 @@ docker push username/radio-app:latest
 # Deploy on server
 docker pull username/radio-app:latest
 docker run -d -p 3000:3000 username/radio-app:latest
+```
+
+## Makefile Commands
+
+The project includes a comprehensive Makefile that simplifies common development, testing, and deployment tasks.
+
+### View All Commands
+
+```bash
+make help
+```
+
+This displays all available targets with descriptions.
+
+### Common Commands
+
+**Development:**
+```bash
+make dev                  # Start development environment
+make stop                 # Stop development environment
+make restart              # Restart development environment
+make logs                 # View development logs
+make shell                # Open shell in container
+```
+
+**Production:**
+```bash
+make prod                 # Start production (nginx + backend + PostgreSQL)
+make prod-down            # Stop production
+make prod-logs            # View all production logs
+make prod-logs-nginx      # View nginx logs only
+make prod-logs-backend    # View backend logs only
+make prod-logs-postgres   # View PostgreSQL logs only
+make prod-status          # Show container status
+make health               # Check service health
+```
+
+**Testing:**
+```bash
+make test                 # Run all 136 tests
+make test-watch           # Run tests in watch mode
+make test-coverage        # Run tests with coverage report
+make test-backend         # Run only backend tests
+make test-frontend        # Run only frontend tests
+make test-docker          # Run tests in Docker container
+```
+
+**Database Management:**
+```bash
+make db-shell-dev         # Connect to SQLite (development)
+make db-shell-prod        # Connect to PostgreSQL (production)
+make backup-dev           # Backup development database
+make backup-prod          # Backup production database
+make restore-dev FILE=... # Restore development database
+make restore-prod FILE=...# Restore production database
+```
+
+**Cleanup:**
+```bash
+make clean                # Remove containers (keeps data)
+make clean-volumes        # Remove all volumes (⚠️ data loss!)
+make clean-all            # Remove everything
+make clean-images         # Remove Docker images
+make prune                # Remove unused Docker resources
+```
+
+**Build & Deploy:**
+```bash
+make build-prod           # Build production images
+make build-dev            # Build development image
+make build-test           # Build test image
+make deploy               # Deploy to production
+```
+
+**Utilities:**
+```bash
+make ps                   # Show running containers
+make volumes              # List Docker volumes
+make images               # List Docker images
+make status               # Show container status
+make version              # Show tool versions
+```
+
+### Example Workflows
+
+**Start fresh development environment:**
+```bash
+make clean
+make dev
+```
+
+**Run tests before deploying:**
+```bash
+make test
+make test-coverage
+make prod
+```
+
+**Backup production database:**
+```bash
+make backup-prod
+# Creates backups/backup-prod-YYYYMMDD-HHMMSS.sql
+```
+
+**View production service health:**
+```bash
+make prod-status
+make health
+```
+
+**Complete cleanup and fresh start:**
+```bash
+make clean-all
+make install
+make prod
 ```
 
 ## Contributing
