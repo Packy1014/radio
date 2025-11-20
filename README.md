@@ -1,5 +1,8 @@
 # Radio Streaming Web Application
 
+[![CI - Tests & Security](https://github.com/Packy1014/radio/actions/workflows/ci.yml/badge.svg)](https://github.com/Packy1014/radio/actions/workflows/ci.yml)
+[![Security Scan](https://github.com/Packy1014/radio/actions/workflows/security.yml/badge.svg)](https://github.com/Packy1014/radio/actions/workflows/security.yml)
+
 A modern web-based radio streaming application featuring live audio playback, song ratings, and metadata display. Built with Node.js and vanilla JavaScript, fully containerized with Docker for easy deployment.
 
 ## Features

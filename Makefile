@@ -1,4 +1,4 @@
-.PHONY: help install dev dev-up dev-down dev-logs prod prod-up prod-down prod-logs prod-status test test-watch test-coverage test-backend test-frontend test-docker clean clean-containers clean-volumes clean-all backup-dev backup-prod restore-dev restore-prod db-shell-dev db-shell-prod health
+.PHONY: help install dev dev-up dev-down dev-logs prod prod-up prod-down prod-logs prod-status test test-watch test-coverage test-backend test-frontend test-docker security-audit security-audit-fix security-audit-production security-audit-full security-check clean clean-containers clean-volumes clean-all backup-dev backup-prod restore-dev restore-prod db-shell-dev db-shell-prod health
 
 # Default target - show help
 .DEFAULT_GOAL := help
@@ -124,6 +124,32 @@ test-docker: ## Run tests in Docker container
 	@echo "$(YELLOW)Running tests in Docker...$(NC)"
 	npm run docker:test
 	@echo "$(GREEN)✓ Docker tests passed$(NC)"
+
+##@ Security
+
+security-audit: ## Run npm audit to check for vulnerabilities
+	@echo "$(YELLOW)Running security audit...$(NC)"
+	@npm audit || (echo "$(RED)✗ Vulnerabilities found$(NC)" && exit 0)
+	@echo "$(GREEN)✓ Security audit complete$(NC)"
+
+security-audit-fix: ## Automatically fix security vulnerabilities
+	@echo "$(YELLOW)Fixing security vulnerabilities...$(NC)"
+	npm audit fix
+	@echo "$(GREEN)✓ Security fixes applied$(NC)"
+
+security-audit-production: ## Run audit for production dependencies only
+	@echo "$(YELLOW)Running production security audit...$(NC)"
+	@npm audit --production || (echo "$(RED)✗ Vulnerabilities found$(NC)" && exit 0)
+	@echo "$(GREEN)✓ Production security audit complete$(NC)"
+
+security-audit-full: ## Run detailed security audit with full report
+	@echo "$(YELLOW)Running detailed security audit...$(NC)"
+	@npm audit --json > security-report.json 2>/dev/null || true
+	@npm audit
+	@echo ""
+	@echo "$(BLUE)Full report saved to: security-report.json$(NC)"
+
+security-check: security-audit ## Run comprehensive security check (alias)
 
 ##@ Database
 

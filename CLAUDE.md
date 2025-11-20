@@ -28,6 +28,11 @@ make test                 # Run all 136 tests
 make test-watch           # Run tests in watch mode
 make test-coverage        # Run tests with coverage
 
+# Security
+make security-audit       # Run npm audit to check for vulnerabilities
+make security-audit-fix   # Automatically fix security vulnerabilities
+make security-check       # Run comprehensive security check
+
 # Database
 make backup-dev           # Backup development SQLite database
 make backup-prod          # Backup production PostgreSQL database
@@ -323,6 +328,211 @@ When adding features:
 3. Add frontend tests (verify UI behavior)
 4. Use existing test patterns as templates
 5. Run `npm run test:watch` during development
+
+## Security
+
+### Security Scanning
+
+The project includes integrated security scanning using npm audit to detect vulnerabilities in dependencies.
+
+### Running Security Scans
+
+**Quick security check:**
+```bash
+make security-audit          # Run npm audit to check for vulnerabilities
+make security-check          # Alias for security-audit
+```
+
+**Fix vulnerabilities automatically:**
+```bash
+make security-audit-fix      # Run npm audit fix to auto-fix issues
+```
+
+**Production-only scan:**
+```bash
+make security-audit-production  # Only scan production dependencies
+```
+
+**Detailed report:**
+```bash
+make security-audit-full     # Generate full JSON report (saved to security-report.json)
+```
+
+### Security Best Practices
+
+1. **Regular Scans**: Run `make security-audit` regularly, especially before deployments
+2. **Dependency Updates**: Keep dependencies up to date with `npm update` and `npm audit fix`
+3. **Review Fixes**: Always review what `npm audit fix` changes before committing
+4. **Production Focus**: Use `make security-audit-production` to focus on production dependencies
+5. **CI/CD Integration**: Consider adding security scanning to your CI/CD pipeline
+
+### Security Report
+
+The `make security-audit-full` command generates a `security-report.json` file with detailed vulnerability information. This file is automatically ignored by git (listed in `.gitignore`).
+
+**Report contents:**
+- Vulnerability severity levels (low, moderate, high, critical)
+- Affected packages and versions
+- Recommended fixes and patches
+- Dependency paths showing how vulnerabilities are introduced
+
+### Interpreting Results
+
+**Severity levels:**
+- **Critical**: Immediate action required, can lead to severe security issues
+- **High**: Should be fixed soon, potential for significant impact
+- **Moderate**: Fix when possible, limited impact or specific conditions required
+- **Low**: Minor issues, fix during regular maintenance
+
+**Exit codes:**
+- The security audit targets use non-failing exit codes to allow integration in workflows
+- Review the output to determine if action is needed
+
+## GitHub Actions CI/CD
+
+### Overview
+
+The project includes automated CI/CD workflows using GitHub Actions for continuous integration, testing, and security monitoring.
+
+### Workflows
+
+**1. CI - Tests & Security (`.github/workflows/ci.yml`)**
+
+Runs on every push and pull request to `main` and `develop` branches, plus daily scheduled runs.
+
+**Jobs:**
+- **test**: Runs all 136 unit tests across multiple Node.js versions (18.x, 20.x, 22.x)
+- **security**: Performs npm audit security scans with artifact uploads
+- **docker-test**: Runs tests in Docker containers
+- **lint**: Code quality checks including dependency verification
+- **summary**: Aggregates all job results
+
+**Features:**
+- Multi-version Node.js testing (18, 20, 22)
+- Test coverage reports uploaded to Codecov
+- Fails on critical vulnerabilities
+- Warns on high severity vulnerabilities
+- Daily security scans at 2 AM UTC
+
+**2. Security Scan (`.github/workflows/security.yml`)**
+
+Dedicated security scanning workflow with enhanced monitoring and alerting.
+
+**Jobs:**
+- **dependency-audit**: Full npm audit with detailed reporting
+- **dependency-review**: Reviews dependency changes in pull requests
+- **outdated-check**: Identifies outdated packages (scheduled runs only)
+
+**Features:**
+- Daily scheduled scans at 3 AM UTC
+- Manual trigger via workflow_dispatch
+- Automatic issue creation for critical vulnerabilities
+- Separate production dependency scanning
+- 90-day artifact retention for audit reports
+- Detailed vulnerability summaries in GitHub Actions summary
+
+**Triggers:**
+- Schedule: Daily at 3 AM UTC
+- Manual: Via GitHub Actions UI
+- Push: When package.json or package-lock.json changes on main branch
+- Pull requests: Dependency review on all PRs
+
+**3. Claude Code (`.github/workflows/claude.yml`)**
+
+Interactive Claude Code assistant triggered by @claude mentions in issues and pull requests.
+
+### Workflow Artifacts
+
+**Security Reports:**
+- `security-report.json` - Full npm audit JSON output
+- `audit-summary.txt` - Human-readable audit summary
+- `audit-prod.json` - Production-only audit results
+- `outdated-report.txt` - Outdated dependencies report
+
+**Access artifacts:**
+1. Go to GitHub Actions tab
+2. Select the workflow run
+3. Scroll to "Artifacts" section
+4. Download desired report
+
+### Required Secrets
+
+Configure these secrets in GitHub repository settings (Settings → Secrets and variables → Actions):
+
+- `CLAUDE_CODE_OAUTH_TOKEN` - Required for Claude Code workflows
+- `CODECOV_TOKEN` - Optional, for uploading test coverage to Codecov
+
+### CI/CD Best Practices
+
+1. **Before Pushing:**
+   - Run `make test` locally to ensure tests pass
+   - Run `make security-audit` to check for vulnerabilities
+   - Fix any critical or high severity issues
+
+2. **Pull Requests:**
+   - All tests must pass before merging
+   - Review security scan results
+   - Address dependency review warnings
+
+3. **Monitoring:**
+   - Check GitHub Actions tab regularly
+   - Review security scan issues when created
+   - Update dependencies based on outdated reports
+
+4. **Security Issues:**
+   - Critical vulnerabilities will fail the CI pipeline
+   - Automated issues will be created for critical findings
+   - Use `npm audit fix` to resolve compatible issues
+   - Test thoroughly after applying security fixes
+
+### Manual Workflow Triggers
+
+**Run security scan manually:**
+1. Go to Actions tab in GitHub
+2. Select "Security Scan" workflow
+3. Click "Run workflow"
+4. Select branch and click "Run workflow"
+
+**View workflow status badges:**
+- CI status: `[![CI](https://github.com/USER/REPO/actions/workflows/ci.yml/badge.svg)](https://github.com/USER/REPO/actions/workflows/ci.yml)`
+- Security status: `[![Security](https://github.com/USER/REPO/actions/workflows/security.yml/badge.svg)](https://github.com/USER/REPO/actions/workflows/security.yml)`
+
+### Troubleshooting CI Failures
+
+**Test failures:**
+```bash
+# Run tests locally
+npm test
+
+# Run specific test suite
+npm run test:backend
+npm run test:frontend
+
+# Run with verbose output
+npm test -- --verbose
+```
+
+**Security failures:**
+```bash
+# Check for vulnerabilities
+npm audit
+
+# Try automatic fixes
+npm audit fix
+
+# Check what will be fixed
+npm audit fix --dry-run
+
+# Force major version updates (use with caution)
+npm audit fix --force
+```
+
+**Docker test failures:**
+```bash
+# Build and run test container locally
+docker build --target test -t radio-test .
+docker run --rm radio-test
+```
 
 ## Environment Variables
 
