@@ -347,7 +347,6 @@ npm audit fix --dry-run
 
 ### Existing Files (unchanged)
 - `.github/workflows/claude.yml` - Claude Code integration
-- `.github/workflows/claude-code-review.yml` - Automated code review
 - `Makefile` - Make targets (already has security-audit from previous update)
 
 ---

@@ -441,10 +441,6 @@ Dedicated security scanning workflow with enhanced monitoring and alerting.
 
 Interactive Claude Code assistant triggered by @claude mentions in issues and pull requests.
 
-**4. Claude Code Review (`.github/workflows/claude-code-review.yml`)**
-
-Automated code review using Claude Code for opened/synchronized pull requests.
-
 ### Workflow Artifacts
 
 **Security Reports:**

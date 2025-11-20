@@ -157,31 +157,6 @@ This document provides details about the GitHub Actions workflows configured for
 
 ---
 
-### 4. Claude Code Review (`claude-code-review.yml`)
-
-**Purpose:** Automated code review using Claude Code
-
-**Triggers:**
-- Pull requests opened
-- Pull requests synchronized (new commits)
-
-**Permissions:**
-- `contents: read`
-- `pull-requests: read`
-- `issues: read`
-- `id-token: write`
-
-**Review Areas:**
-- Code quality and best practices
-- Potential bugs or issues
-- Performance considerations
-- Security concerns
-- Test coverage
-
-**Required Secret:** `CLAUDE_CODE_OAUTH_TOKEN`
-
----
-
 ## Setup Instructions
 
 ### 1. Configure Secrets
@@ -192,7 +167,7 @@ Add the following secrets:
 
 - **CLAUDE_CODE_OAUTH_TOKEN** (Required)
   - Obtain from Claude Code settings
-  - Required for claude.yml and claude-code-review.yml
+  - Required for claude.yml
 
 - **CODECOV_TOKEN** (Optional)
   - Obtain from codecov.io
