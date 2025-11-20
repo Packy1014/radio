@@ -1,0 +1,224 @@
+name: Security Scan
+
+on:
+  # Run security scans daily at 3 AM UTC
+  schedule:
+    - cron: '0 3 * * *'
+  # Allow manual trigger
+  workflow_dispatch:
+  # Run on push to main
+  push:
+    branches: [ main ]
+    paths:
+      - 'package.json'
+      - 'package-lock.json'
+
+jobs:
+  dependency-audit:
+    name: Dependency Security Audit
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run full npm audit
+        id: npm-audit
+        run: |
+          echo "Running npm audit..."
+          npm audit --json > audit-full.json || true
+          npm audit > audit-summary.txt || true
+          cat audit-summary.txt
+
+      - name: Run production audit
+        id: npm-audit-prod
+        run: |
+          echo "Running production-only audit..."
+          npm audit --production --json > audit-prod.json || true
+          npm audit --production > audit-prod-summary.txt || true
+          cat audit-prod-summary.txt
+
+      - name: Parse audit results
+        id: parse-results
+        run: |
+          # Parse vulnerability counts
+          CRITICAL=$(cat audit-full.json | grep -o '"critical":[0-9]*' | head -1 | grep -o '[0-9]*' || echo "0")
+          HIGH=$(cat audit-full.json | grep -o '"high":[0-9]*' | head -1 | grep -o '[0-9]*' || echo "0")
+          MODERATE=$(cat audit-full.json | grep -o '"moderate":[0-9]*' | head -1 | grep -o '[0-9]*' || echo "0")
+          LOW=$(cat audit-full.json | grep -o '"low":[0-9]*' | head -1 | grep -o '[0-9]*' || echo "0")
+
+          echo "critical=$CRITICAL" >> $GITHUB_OUTPUT
+          echo "high=$HIGH" >> $GITHUB_OUTPUT
+          echo "moderate=$MODERATE" >> $GITHUB_OUTPUT
+          echo "low=$LOW" >> $GITHUB_OUTPUT
+
+          # Create summary
+          echo "## Security Audit Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Severity | Count |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Critical | $CRITICAL |" >> $GITHUB_STEP_SUMMARY
+          echo "| High | $HIGH |" >> $GITHUB_STEP_SUMMARY
+          echo "| Moderate | $MODERATE |" >> $GITHUB_STEP_SUMMARY
+          echo "| Low | $LOW |" >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload audit reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-audit-reports
+          path: |
+            audit-full.json
+            audit-summary.txt
+            audit-prod.json
+            audit-prod-summary.txt
+          retention-days: 90
+
+      - name: Check for critical vulnerabilities
+        if: steps.parse-results.outputs.critical != '0'
+        run: |
+          echo "::error::Found ${{ steps.parse-results.outputs.critical }} critical vulnerabilities"
+          cat audit-summary.txt
+          exit 1
+
+      - name: Check for high vulnerabilities
+        if: steps.parse-results.outputs.high != '0'
+        run: |
+          echo "::warning::Found ${{ steps.parse-results.outputs.high }} high severity vulnerabilities"
+          cat audit-summary.txt
+
+      - name: Create issue on critical vulnerabilities
+        if: failure() && steps.parse-results.outputs.critical != '0'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const summary = fs.readFileSync('audit-summary.txt', 'utf8');
+            const critical = '${{ steps.parse-results.outputs.critical }}';
+            const high = '${{ steps.parse-results.outputs.high }}';
+
+            const issueTitle = `🚨 Critical Security Vulnerabilities Detected (${critical} critical, ${high} high)`;
+            const issueBody = `## Security Alert
+
+            Automated security scan detected vulnerabilities in dependencies:
+
+            - **Critical**: ${critical}
+            - **High**: ${high}
+            - **Moderate**: ${{ steps.parse-results.outputs.moderate }}
+            - **Low**: ${{ steps.parse-results.outputs.low }}
+
+            ### Audit Summary
+
+            \`\`\`
+            ${summary}
+            \`\`\`
+
+            ### Recommended Actions
+
+            1. Review the full audit report in the workflow artifacts
+            2. Run \`npm audit fix\` to automatically fix compatible issues
+            3. Manually update packages that cannot be automatically fixed
+            4. Test thoroughly after applying fixes
+
+            ### Quick Fix Commands
+
+            \`\`\`bash
+            # Try automatic fix
+            npm audit fix
+
+            # For breaking changes
+            npm audit fix --force
+
+            # Check production dependencies only
+            npm audit --production
+            \`\`\`
+
+            ---
+            *This issue was automatically created by the Security Scan workflow.*
+            `;
+
+            // Check if there's already an open issue
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'security,automated'
+            });
+
+            const existingIssue = issues.data.find(issue =>
+              issue.title.includes('Critical Security Vulnerabilities Detected')
+            );
+
+            if (existingIssue) {
+              // Update existing issue
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existingIssue.number,
+                body: `## Updated Security Scan Results\n\n${issueBody}`
+              });
+            } else {
+              // Create new issue
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: issueTitle,
+                body: issueBody,
+                labels: ['security', 'automated', 'critical']
+              });
+            }
+
+  dependency-review:
+    name: Dependency Review
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Dependency Review
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+          comment-summary-in-pr: true
+
+  outdated-check:
+    name: Check Outdated Dependencies
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check for outdated packages
+        run: |
+          echo "## Outdated Dependencies" >> outdated-report.txt
+          echo "" >> outdated-report.txt
+          npm outdated >> outdated-report.txt || true
+          cat outdated-report.txt
+
+      - name: Upload outdated report
+        uses: actions/upload-artifact@v4
+        with:
+          name: outdated-dependencies-report
+          path: outdated-report.txt
+          retention-days: 30
