@@ -1,17 +1,8 @@
 name: Security Scan
 
 on:
-  # Run security scans daily at 3 AM UTC
-  schedule:
-    - cron: '0 3 * * *'
-  # Allow manual trigger
+  # Allow manual trigger only
   workflow_dispatch:
-  # Run on push to main
-  push:
-    branches: [ main ]
-    paths:
-      - 'package.json'
-      - 'package-lock.json'
 
 jobs:
   dependency-audit:
@@ -194,7 +185,6 @@ jobs:
   outdated-check:
     name: Check Outdated Dependencies
     runs-on: ubuntu-latest
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
 
     steps:
       - name: Checkout repository
