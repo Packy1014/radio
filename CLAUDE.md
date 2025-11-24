@@ -412,7 +412,6 @@ Runs on every push and pull request to `main` and `develop` branches, plus daily
 - Test coverage reports uploaded to Codecov
 - Fails on critical vulnerabilities
 - Warns on high severity vulnerabilities
-- Daily security scans at 2 AM UTC
 
 **2. Security Scan (`.github/workflows/security.yml`)**
 
@@ -421,10 +420,9 @@ Dedicated security scanning workflow with enhanced monitoring and alerting.
 **Jobs:**
 - **dependency-audit**: Full npm audit with detailed reporting
 - **dependency-review**: Reviews dependency changes in pull requests
-- **outdated-check**: Identifies outdated packages (scheduled runs only)
+- **outdated-check**: Identifies outdated packages
 
 **Features:**
-- Daily scheduled scans at 3 AM UTC
 - Manual trigger via workflow_dispatch
 - Automatic issue creation for critical vulnerabilities
 - Separate production dependency scanning
@@ -432,9 +430,7 @@ Dedicated security scanning workflow with enhanced monitoring and alerting.
 - Detailed vulnerability summaries in GitHub Actions summary
 
 **Triggers:**
-- Schedule: Daily at 3 AM UTC
-- Manual: Via GitHub Actions UI
-- Push: When package.json or package-lock.json changes on main branch
+- Manual: Via GitHub Actions UI (workflow_dispatch)
 - Pull requests: Dependency review on all PRs
 
 **3. Claude Code (`.github/workflows/claude.yml`)**
