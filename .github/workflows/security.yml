@@ -51,10 +51,10 @@ jobs:
         id: parse-results
         run: |
           # Parse vulnerability counts
-          CRITICAL=$(cat audit-full.json | grep -o '"critical":[0-9]*' | head -1 | grep -o '[0-9]*' || echo "0")
-          HIGH=$(cat audit-full.json | grep -o '"high":[0-9]*' | head -1 | grep -o '[0-9]*' || echo "0")
-          MODERATE=$(cat audit-full.json | grep -o '"moderate":[0-9]*' | head -1 | grep -o '[0-9]*' || echo "0")
-          LOW=$(cat audit-full.json | grep -o '"low":[0-9]*' | head -1 | grep -o '[0-9]*' || echo "0")
+          CRITICAL=$(cat audit-full.json | grep -o '"critical": [0-9]*' | head -1 | grep -o '[0-9]*' || echo "0")
+          HIGH=$(cat audit-full.json | grep -o '"high": [0-9]*' | head -1 | grep -o '[0-9]*' || echo "0")
+          MODERATE=$(cat audit-full.json | grep -o '"moderate": [0-9]*' | head -1 | grep -o '[0-9]*' || echo "0")
+          LOW=$(cat audit-full.json | grep -o '"low": [0-9]*' | head -1 | grep -o '[0-9]*' || echo "0")
 
           echo "critical=$CRITICAL" >> $GITHUB_OUTPUT
           echo "high=$HIGH" >> $GITHUB_OUTPUT
